@@ -87,6 +87,34 @@ cd agent-copilot/evals && uv run python -m evals.run --target fake --suite golde
 
 The hackathon dataset is not included in this repo. Point `DATA_DIR` at it in `.env`.
 
+## Deploy
+
+One container serves both the UI and the API (`agent-copilot/Dockerfile`), with sign-in required. It runs as a single instance with a volume at `/data`, because DuckDB is single-writer and live chat state is in-process.
+
+On [Fly.io](https://fly.io), from `agent-copilot/`:
+
+```bash
+fly launch --no-deploy --copy-config --ha=false
+```
+
+```bash
+fly secrets set AUTH_SECRET=$(openssl rand -hex 32) GEMINI_API_KEY=your-key
+```
+
+```bash
+fly deploy --ha=false
+```
+
+Accounts are created by an operator, not by sign-up. Each account signs in as one dataset user (`U-101` ... see `/api/users`):
+
+```bash
+fly ssh console --pty -C "sh -c 'cd /app/backend && uv run --no-sync python -m wellops.api.auth add you@example.com U-101'"
+```
+
+The same command takes `list` and `remove <email>`. Locally, sign-in stays off unless `AUTH_SECRET` is set in `.env`.
+
+Signed-in users are trusted colleagues: an account cannot act as another user, but record and result lookups are not restricted per user beyond what the agent already enforces for private history.
+
 ## Read the thinking
 
 | Document | What is in it |

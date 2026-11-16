@@ -1,0 +1,34 @@
+# Fly.io: one machine, one volume. Do not scale out: DuckDB is single-writer and chat state is in-process.
+# First deploy, from agent-copilot/ (see README "Deploy"):
+#   fly launch --no-deploy --copy-config --ha=false
+#   fly secrets set AUTH_SECRET=$(openssl rand -hex 32) GEMINI_API_KEY=... [ELEVENLABS_API_KEY=...]
+#   fly deploy --ha=false
+app = "wellops-copilot"
+primary_region = "bom"
+
+[env]
+  # UI and API share this origin; no other site may call the API from a browser. Change if the app name changes.
+  CORS_ORIGINS = "https://wellops-copilot.fly.dev"
+
+[mounts]
+  source = "wellops_data"
+  destination = "/data"
+  initial_size = "1gb"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "off"  # live chat transcripts are held in memory; a stopped machine forgets them
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/api/health"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "5m"  # first boot builds the database (and embeds the knowledge base) before serving
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"  # ingest peaks near 220 MB; the rest is headroom for DuckDB queries

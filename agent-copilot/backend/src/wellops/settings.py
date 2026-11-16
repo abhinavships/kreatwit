@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     skills_learn: bool = True  # distill/reinforce skills from finished turns (skills.on_turn_complete)
     skills_llm_polish: bool = False  # optional Gemini rewrite of auto-skill name/description (never in tests)
     skills_llm_model: str = "gemini-3.5-flash-lite"
+    auth_secret: str = ""  # signs session cookies; empty = sign-in off (local dev). See wellops.api.auth
+    cors_origins: str = "*"  # comma-separated allowed browser origins; set to the frontend URL in production
     self_url: str = "http://127.0.0.1:8000"  # where this API (and its /mcp) is reachable from local agents
     judge_enabled: bool = True  # LLM-as-a-judge on every live answer (wellops.qa.judge); no-op without GEMINI_API_KEY
     judge_mode: str = "async"  # async: background, never blocks | blocking: awaited, a FAIL re-asks once

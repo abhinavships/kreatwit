@@ -1,2 +1,2 @@
-import { Shell } from "@/components/Shell";
-export default function Page() { return <Shell />; }
+import { AuthGate } from "@/components/AuthGate";
+export default function Page() { return <AuthGate />; }

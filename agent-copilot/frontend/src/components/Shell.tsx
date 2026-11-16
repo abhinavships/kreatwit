@@ -27,7 +27,7 @@ const ls = {
 };
 const newChatId = () => `chat-${uid().slice(0, 8)}`;
 
-export function Shell() {
+export function Shell({ account }: { account?: { email: string; onSignOut: () => void } }) {
   const [users, setUsers] = useState<User[]>([]);
   const [userId, setUserId] = useState("U-201");
   const [today, setToday] = useState(DEFAULT_TODAY);
@@ -171,7 +171,7 @@ export function Shell() {
 
   const switchUser = (id: string) => { setUserId(id); ls.set("wellops.user", id); setLeftOpen(false); };
   const sidebar = (
-    <Sidebar users={users} userId={userId} onUser={switchUser} chats={chats} chatId={chatId} onChat={openChat}
+    <Sidebar users={account ? users.filter((u) => u.user_id === userId) : users} account={account} userId={userId} onUser={switchUser} chats={chats} chatId={chatId} onChat={openChat}
       onNew={() => openChat(newChatId())} today={today} resetToday={serverToday} onToday={(d) => { setToday(d); ls.set("wellops.today", d); }} mock={MOCK} />
   );
   const xray = <XrayPanel turns={turns} selected={selTurn} onSelect={setSelTurn} />;
