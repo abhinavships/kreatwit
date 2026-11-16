@@ -27,7 +27,10 @@ from wellops.tools.core import ToolError, get_db, store
 from wellops.verify import VERIFICATIONS
 
 app = FastAPI(title="wellops")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+from .auth import AuthMiddleware, router as auth_router; app.include_router(auth_router)  # noqa: E402, E702
+app.add_middleware(AuthMiddleware)  # added before CORS so CORS stays outermost (401s keep their CORS headers)
+app.add_middleware(CORSMiddleware, allow_origins=[o.strip() for o in settings.cors_origins.split(",")],
+                   allow_methods=["*"], allow_headers=["*"])
 from .voice import router; app.include_router(router)  # noqa: E402, E702
 from .ingest_api import router as ingest_router; app.include_router(ingest_router)  # noqa: E402, E702
 from .media_gen_api import router as media_gen_router; app.include_router(media_gen_router)  # noqa: E402, E702
@@ -227,3 +230,10 @@ INSTANCE = uuid.uuid4().hex[:8]
 from wellops import mcp_server  # noqa: E402
 
 mcp_server.install(app)
+
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+
+from wellops.settings import ROOT  # noqa: E402
+
+if (ROOT / "frontend" / "out").is_dir():  # the exported UI, served from the same origin as the API (see Dockerfile)
+    app.mount("/", StaticFiles(directory=ROOT / "frontend" / "out", html=True))

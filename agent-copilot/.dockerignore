@@ -1,0 +1,12 @@
+*
+!backend/pyproject.toml
+!backend/uv.lock
+!backend/README.md
+!backend/src
+!skills
+!frontend
+frontend/node_modules
+frontend/.next
+frontend/out
+frontend/public/maplibre
+**/__pycache__

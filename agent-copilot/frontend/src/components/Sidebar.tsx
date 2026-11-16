@@ -4,7 +4,7 @@ import type { ChatSummary, User } from "@/contracts";
 import { roleLabel, teamLabel } from "@/lib/format";
 
 export function Sidebar(p: {
-  users: User[]; userId: string; onUser: (id: string) => void;
+  users: User[]; userId: string; onUser: (id: string) => void; account?: { email: string; onSignOut: () => void };
   chats: ChatSummary[]; chatId: string; onChat: (id: string) => void; onNew: () => void;
   today: string; resetToday?: string; onToday: (d: string) => void; mock: boolean;
 }) {
@@ -18,7 +18,7 @@ export function Sidebar(p: {
       </div>
 
       <section aria-label="User">
-        <h2 className="mb-1 px-1 text-[11px] font-semibold uppercase tracking-wide text-muted">Acting as</h2>
+        <h2 className="mb-1 px-1 text-[11px] font-semibold uppercase tracking-wide text-muted">{p.account ? "Signed in as" : "Acting as"}</h2>
         <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls="user-list"
           className="flex w-full items-center justify-between gap-2 rounded-lg border border-line bg-panel px-3 py-2 text-left hover:border-accent">
           <span className="min-w-0">
@@ -39,6 +39,12 @@ export function Sidebar(p: {
               </li>
             ))}
           </ul>
+        )}
+        {p.account && (
+          <div className="mt-1 flex items-center justify-between gap-2 px-1 text-xs text-muted">
+            <span className="truncate">{p.account.email}</span>
+            <button type="button" onClick={p.account.onSignOut} className="shrink-0 underline hover:text-fg">Sign out</button>
+          </div>
         )}
       </section>
 
