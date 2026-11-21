@@ -1,9 +1,9 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from wellops import tools
-from wellops.api import app as api
-from wellops.tools.core import ToolOut
+from kreatwit import tools
+from kreatwit.api import app as api
+from kreatwit.tools.core import ToolOut
 
 U1 = {"X-User-Id": "U-201"}
 U2 = {"X-User-Id": "U-202"}

@@ -1,6 +1,6 @@
-from wellops.memory.constraints import check
-from wellops.memory.disputes import propose_correction, resolve_dispute
-from wellops.tools.core import get_db
+from kreatwit.memory.constraints import check
+from kreatwit.memory.disputes import propose_correction, resolve_dispute
+from kreatwit.tools.core import get_db
 
 
 def chat_assertions():
@@ -18,7 +18,7 @@ def test_constraints_reject_nonsense_and_explain_computed_fields():
 
 def test_multi_field_edit_without_reason_is_checked_per_field_and_waits(deps, monkeypatch):
     """(feedback_commits off) The user's row edit: 25.6 -> 22.6, 25.6 -> 3000.6, delta 3.2 -> 1.2.2, threshold 15 -> infinity, no reason."""
-    from wellops.settings import settings
+    from kreatwit.settings import settings
     monkeypatch.setattr(settings, "feedback_commits", False)
     d = deps("U-201", "multi")
     r = propose_correction(d, "INS-0001-0203", {"wellhead_temp_c": "22.6", "wellhead_recorded_c": "3000.6",

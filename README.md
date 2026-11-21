@@ -1,6 +1,6 @@
-# WellOps Copilot
+# Kreatwit
 
-**A chat copilot over oil-field asset data that refuses to give an answer it cannot prove.**
+**Aletheia**, the Kreatwit copilot, answers questions over your company's data and refuses to give an answer it cannot prove.
 
 Ask it which wells are down, what a spill cost, or which inspections are overdue. It answers with numbers computed in SQL, picks its own chart, cites the records behind every figure, and tells you when the sources disagree. Every number in the reply is re-checked against the query result before it reaches the screen.
 
@@ -12,7 +12,7 @@ Built solo for FlytBase Hack Day (Asset Intelligence Copilot track), judged on b
 
 Most data copilots trust the model. This one treats the model as the least reliable part of the system.
 
-| Problem | What WellOps does |
+| Problem | What Kreatwit does |
 |---|---|
 | Models invent numbers | **Claims-bound answers.** Each figure is a claim `{value, handle, column, row_key}` that is re-executed against its result. A mismatch sends a diff back to the model, at most twice, and otherwise no answer is emitted. |
 | Data lies too | **Trust layer.** A data audit found 24 traps (stale status snapshots, hot wellheads that are idle, corrections stored as notes). Each becomes a data-quality flag that travels with the result. |
@@ -33,7 +33,7 @@ L1  Trust          provenance on every fact · data-quality flags · overlays ·
 L0  Substrate      one DuckDB file: raw tables · canonical views · report facts · full-text search
 ```
 
-Each layer talks to the next through a typed contract (`backend/src/wellops/contracts`, mirrored in `frontend/src/contracts.ts`), so a layer can be replaced without rewiring the ones above it.
+Each layer talks to the next through a typed contract (`backend/src/kreatwit/contracts`, mirrored in `frontend/src/contracts.ts`), so a layer can be replaced without rewiring the ones above it.
 
 Large results never pass through the model: tools return a preview plus a **handle**, and the UI fetches full rows by handle.
 
@@ -64,7 +64,7 @@ That last row is the design working as intended, and also its cost: a very small
 Backend (Python 3.12, [uv](https://docs.astral.sh/uv/)):
 
 ```bash
-cd agent-copilot/backend && cp ../.env.example ../.env && uv run uvicorn wellops.api.app:app --port 8000
+cd agent-copilot/backend && cp ../.env.example ../.env && uv run uvicorn kreatwit.api.app:app --port 8000
 ```
 
 Frontend:
@@ -89,31 +89,28 @@ The hackathon dataset is not included in this repo. Point `DATA_DIR` at it in `.
 
 ## Deploy
 
-One container serves both the UI and the API (`agent-copilot/Dockerfile`), with sign-in required. It runs as a single instance with a volume at `/data`, because DuckDB is single-writer and live chat state is in-process.
+One container serves the site, the app and the API (`agent-copilot/Dockerfile`). Public mode is on whenever `AUTH_SECRET` is set:
 
-On [Fly.io](https://fly.io), from `agent-copilot/`:
+- Accounts live in [Supabase](https://supabase.com) (sign-up, email confirmation, password reset). The browser signs in with supabase-js and hands the session to the API, which sets its own HttpOnly cookie.
+- Every account gets its own DuckDB file, copied from a template built from the sample dataset. Its connection is sandboxed: no file access outside the account's upload folder, no `ATTACH`, no extension installs. Caches, chat handles and uploads live beside it.
+- Daily caps per account: `DAILY_QUESTIONS`, `DAILY_UPLOADS`, `MAX_UPLOAD_MB`.
+- `/mcp` and `/skills-mcp` (for local agent clients) are not exposed.
+
+It runs as a single instance with a volume at `/data`. On [Fly.io](https://fly.io), from `agent-copilot/`:
 
 ```bash
 fly launch --no-deploy --copy-config --ha=false
 ```
 
 ```bash
-fly secrets set AUTH_SECRET=$(openssl rand -hex 32) GEMINI_API_KEY=your-key
+fly secrets set AUTH_SECRET=$(openssl rand -hex 32) SUPABASE_URL=https://YOUR-PROJECT.supabase.co SUPABASE_ANON_KEY=YOUR-PUBLISHABLE-KEY GEMINI_API_KEY=YOUR-KEY
 ```
 
 ```bash
 fly deploy --ha=false
 ```
 
-Accounts are created by an operator, not by sign-up. Each account signs in as one dataset user (`U-101` ... see `/api/users`):
-
-```bash
-fly ssh console --pty -C "sh -c 'cd /app/backend && uv run --no-sync python -m wellops.api.auth add you@example.com U-101'"
-```
-
-The same command takes `list` and `remove <email>`. Locally, sign-in stays off unless `AUTH_SECRET` is set in `.env`.
-
-Signed-in users are trusted colleagues: an account cannot act as another user, but record and result lookups are not restricted per user beyond what the agent already enforces for private history.
+In the Supabase dashboard, under Authentication > URL Configuration, set the Site URL to the app's address and add `https://YOUR-APP/login/` to the redirect URLs.
 
 ## Read the thinking
 

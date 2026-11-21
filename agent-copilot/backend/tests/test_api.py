@@ -4,8 +4,8 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 
-from wellops.agent import build_agent
-from wellops.api import app as api
+from kreatwit.agent import build_agent
+from kreatwit.api import app as api
 
 from test_agent import final, handle_of, scripted
 
@@ -41,7 +41,7 @@ def test_agui_streams_answer_verification_and_serves_handle(client):
     types = [e["type"] for e in ev]
     assert types[0] == "RUN_STARTED" and types[-1] == "RUN_FINISHED" and "TOOL_CALL_START" in types
     custom = {e["name"]: e["value"] for e in ev if e["type"] == "CUSTOM"}
-    ans, ver = custom["wellops.answer"], custom["wellops.verification"]
+    ans, ver = custom["kreatwit.answer"], custom["kreatwit.verification"]
     assert ans["claims"][0]["value"] == 0.4 and ver["ok"] and ver["retries"] == 0
     h = ans["claims"][0]["handle"]
     d = client.get(f"/api/handles/{h}", params={"chat_id": "api1"}).json()
@@ -64,5 +64,5 @@ def test_rest_endpoints(client):
 
 
 def test_live_system_prompt_formats():
-    from wellops.api.turn_stream import SYSTEM
+    from kreatwit.api.turn_stream import SYSTEM
     assert "U-201" in SYSTEM.format(today="2026-10-17", principal="U-201")

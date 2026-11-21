@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChatSummary, User } from "@/contracts";
 import { API_BASE, DEFAULT_TODAY, MOCK, fetchChats, fetchHandle, fetchUsers, ingestFile, type Ctx } from "@/lib/api";
 import { uid } from "@/lib/agui";
+import type { Account } from "@/lib/auth";
 import { useChat } from "@/lib/chat";
 import { SCENARIOS } from "@/mock/fixtures";
 import { AnswerView } from "@/components/AnswerView";
@@ -26,10 +27,11 @@ const ls = {
   set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } },
 };
 const newChatId = () => `chat-${uid().slice(0, 8)}`;
+const STARTERS = ["What data have I uploaded?", "Summarize my latest upload", "What stands out in my data?"];
 
-export function Shell({ account }: { account?: { email: string; onSignOut: () => void } }) {
+export function Shell({ account }: { account?: Account }) {
   const [users, setUsers] = useState<User[]>([]);
-  const [userId, setUserId] = useState("U-201");
+  const [userId, setUserId] = useState(account?.member.user_id ?? "U-201"); // signed in: you are you, no switching
   const [today, setToday] = useState(DEFAULT_TODAY);
   const [serverToday, setServerToday] = useState(DEFAULT_TODAY);
   const [chats, setChats] = useState<ChatSummary[]>([]);
@@ -51,28 +53,30 @@ export function Shell({ account }: { account?: { email: string; onSignOut: () =>
   const ctx: Ctx = useMemo(() => ({ userId, chatId, today }), [userId, chatId, today]);
   const { turns, turnsChat, busy, send, stop, addLocal } = useChat(ctx);
   const boardCount = useBoard().length;
+  const ownData = !!account && !account.member.sample; // a real workspace: real dates, no sample wells
 
   // restore preferences
   useEffect(() => {
-    const t = ls.get("wellops.theme") as "light" | "dark" | null; if (t) setTheme(t);
-    const d = ls.get("wellops.today"); if (d) setToday(d);
+    const t = ls.get("kreatwit.theme") as "light" | "dark" | null; if (t) setTheme(t);
+    if (ownData) { const now = new Date().toISOString().slice(0, 10); setToday(now); setServerToday(now); return; }
+    const d = ls.get("kreatwit.today"); if (d) setToday(d);
     // the backend's dataset decides "today": a new dataset (e.g. test data, today = 2027-01-15) resets the clock
     fetch(`${API_BASE}/api/health`).then((r) => r.json()).then((h: { dataset?: string; clock_today?: string }) => {
       if (!h.clock_today) return;
       setServerToday(h.clock_today);
-      if (ls.get("wellops.dataset") !== h.dataset || !d) { setToday(h.clock_today); ls.set("wellops.today", h.clock_today); }
-      ls.set("wellops.dataset", h.dataset ?? "");
+      if (ls.get("kreatwit.dataset") !== h.dataset || !d) { setToday(h.clock_today); ls.set("kreatwit.today", h.clock_today); }
+      ls.set("kreatwit.dataset", h.dataset ?? "");
     }).catch(() => { /* offline: keep the stored clock */ });
-    const u = ls.get("wellops.user"); if (u) setUserId(u);
-  }, []);
+    const u = ls.get("kreatwit.user"); if (u && !account) setUserId(u);
+  }, [account, ownData]);
   useEffect(() => { setBoardUser(userId); setCurrentCanvas(null); }, [userId]); // each user has their own canvas
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme === "dark" ? "dark" : "light");
-    ls.set("wellops.theme", theme);
+    ls.set("kreatwit.theme", theme);
   }, [theme]);
   useEffect(() => { fetchUsers().then(setUsers).catch((e: Error) => setLoadErr(`Could not load users: ${e.message}`)); }, []);
 
-  const registryKey = `wellops.chats.${userId}`;
+  const registryKey = `kreatwit.chats.${userId}`;
   const loadChats = useCallback(async () => {
     let local: ChatSummary[] = [];
     try { local = JSON.parse(ls.get(registryKey) ?? "[]") as ChatSummary[]; } catch { /* ignore */ }
@@ -93,12 +97,12 @@ export function Shell({ account }: { account?: { email: string; onSignOut: () =>
     const seq = ++loadSeq.current;
     loadChats().then((all) => {
       if (seq !== loadSeq.current) return; // a newer user switch is in flight
-      const last = ls.get(`wellops.chat.${userId}`);
+      const last = ls.get(`kreatwit.chat.${userId}`);
       const id = last ?? all[0]?.chat_id ?? newChatId();
-      setChatId(id); ls.set(`wellops.chat.${userId}`, id);
+      setChatId(id); ls.set(`kreatwit.chat.${userId}`, id);
     });
   }, [loadChats, userId]);
-  const openChat = (id: string) => { setChatId(id); ls.set(`wellops.chat.${userId}`, id); setLeftOpen(false); };
+  const openChat = (id: string) => { setChatId(id); ls.set(`kreatwit.chat.${userId}`, id); setLeftOpen(false); };
 
   // register chat in the local list once it has a first turn
   const firstText = turnsChat === chatId ? turns[0]?.userText : undefined; // never the previous chat's question
@@ -169,13 +173,18 @@ export function Shell({ account }: { account?: { email: string; onSignOut: () =>
     if (v) speak("Voice mode on.").catch(() => {}); else stopSpeaking(); // the click unlocks audio playback in the browser
   };
 
-  const switchUser = (id: string) => { setUserId(id); ls.set("wellops.user", id); setLeftOpen(false); };
+  const switchUser = (id: string) => { setUserId(id); ls.set("kreatwit.user", id); setLeftOpen(false); };
   const sidebar = (
-    <Sidebar users={account ? users.filter((u) => u.user_id === userId) : users} account={account} userId={userId} onUser={switchUser} chats={chats} chatId={chatId} onChat={openChat}
-      onNew={() => openChat(newChatId())} today={today} resetToday={serverToday} onToday={(d) => { setToday(d); ls.set("wellops.today", d); }} mock={MOCK} />
+    <Sidebar users={users} account={account} userId={userId} onUser={switchUser} chats={chats} chatId={chatId} onChat={openChat}
+      onNew={() => openChat(newChatId())} today={today} resetToday={serverToday} onToday={(d) => { setToday(d); ls.set("kreatwit.today", d); }} mock={MOCK} showClock={!ownData} />
   );
   const xray = <XrayPanel turns={turns} selected={selTurn} onSelect={setSelTurn} />;
 
+  const chip = "rounded-full border border-line bg-panel px-3.5 py-1.5 text-[13px] transition hover:border-fg";
+  const lastTurn = turns[turns.length - 1];
+  // follow-ups the answer suggested; otherwise generic ways to dig into the last answer
+  const nextUp = lastTurn?.answer?.follow_ups?.length ? lastTurn.answer.follow_ups.slice(0, 3)
+    : lastTurn?.status === "done" ? ["Show this as a chart", "Which records is this based on?", "Break this down further"] : [];
   const iconBtn = "grid h-9 w-9 place-items-center rounded-full text-muted transition hover:bg-raised hover:text-fg disabled:opacity-40";
   const composer = (
     <form onSubmit={(e) => { e.preventDefault(); submit(input); }}
@@ -183,7 +192,7 @@ export function Shell({ account }: { account?: { email: string; onSignOut: () =>
       onDrop={(e) => { e.preventDefault(); setDragOver(false); if (e.dataTransfer.files.length) upload(e.dataTransfer.files); }}
       className={`rounded-[30px] border bg-panel p-2 shadow-[0_1px_0_rgb(var(--line)),0_24px_48px_-28px_rgb(0_0_0/.45)] transition focus-within:border-fg/40 ${dragOver ? "border-fg ring-4 ring-hl/60" : "border-line"}`}>
       <label htmlFor="msg" className="sr-only">Message</label>
-      <textarea id="msg" rows={2} value={input} onChange={(e) => setInput(e.target.value)} placeholder={dragOver ? "Drop a CSV, PDF or photo to ingest…" : "Ask about a well, an area, spills, downtime…"}
+      <textarea id="msg" rows={2} value={input} onChange={(e) => setInput(e.target.value)} placeholder={dragOver ? "Drop a CSV, PDF or photo to ingest…" : ownData ? "Ask about your data, or attach a file…" : "Ask about a well, an area, spills, downtime…"}
         onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(input); } }}
         className="max-h-48 min-h-14 w-full resize-none bg-transparent px-4 pt-3 text-[16px] outline-none placeholder:text-muted/80" />
       <div className="flex items-center gap-1 px-1">
@@ -220,7 +229,7 @@ export function Shell({ account }: { account?: { email: string; onSignOut: () =>
         <main className="flex min-w-0 flex-1 flex-col">
           <header className="flex items-center gap-3 border-b border-line/70 bg-bg/60 px-5 py-3 backdrop-blur">
             <button type="button" className={`${iconBtn} md:hidden`} onClick={() => setLeftOpen(true)} aria-label="Open menu">☰</button>
-            <h1 className="label min-w-0 flex-1 truncate"><span className="text-fg">WellOps</span> · case file <span suppressHydrationWarning>{chatId.replace(/^chat-/, "").slice(0, 6).toUpperCase()}</span><span className="hidden sm:inline"> · {chats.find((c) => c.chat_id === chatId)?.title || "new inquiry"}</span></h1>
+            <h1 className="label min-w-0 flex-1 truncate"><span className="text-fg">Aletheia</span> · case file <span suppressHydrationWarning>{chatId.replace(/^chat-/, "").slice(0, 6).toUpperCase()}</span><span className="hidden sm:inline"> · {chats.find((c) => c.chat_id === chatId)?.title || "new inquiry"}</span></h1>
             <span className="label hidden md:inline">as of {today}</span>
             <button type="button" onClick={() => setCompareOpen((v) => !v)} aria-pressed={compareOpen} data-testid="toggle-compare"
               className={`hidden rounded-full px-3 py-1.5 text-xs transition lg:inline-flex ${compareOpen ? "bg-fg text-bg" : "border border-line text-muted hover:border-fg hover:text-fg"}`}>
@@ -248,18 +257,23 @@ export function Shell({ account }: { account?: { email: string; onSignOut: () =>
               {loadErr && <p role="alert" className="rounded-2xl border border-bad/30 bg-bad/10 p-3 text-sm text-bad">{loadErr}. Is the backend running at the configured API base?</p>}
               {turns.length === 0 && (
                 <div className="flex min-h-[68vh] flex-col justify-center">
-                  <div className="label flex items-center justify-between border-b border-line pb-2"><span><span className="text-warn">Wellops</span> · asset intelligence</span><span>Fig. 0 — every figure traces to a record</span></div>
+                  <div className="label flex items-center justify-between border-b border-line pb-2"><span><span className="text-warn">Aletheia</span> · by Kreatwit</span><span>Fig. 0 — every figure traces to a record</span></div>
                   <div className="mx-auto mt-10 inline-flex items-center gap-2 rounded-full border border-line bg-panel px-1.5 py-1 text-[13px]">
                     <span className="rounded-full bg-fg px-2 py-0.5 font-mono text-[10px] tracking-widest text-bg">NEW</span>
                     <span>Proof before any correction · drag figures to compare</span>
                   </div>
-                  <h2 className="display mt-6 text-center text-5xl font-bold leading-[1.02] sm:text-6xl">Ask your <span className="hl">wells</span><br />anything.</h2>
-                  <p className="mx-auto mt-4 max-w-md text-center text-[15px] text-muted">Status, downtime, spills, duties. Answers come back as a figure you can touch, with the records behind every number.</p>
+                  <h2 className="display mt-6 text-center text-5xl font-bold leading-[1.02] sm:text-6xl">Ask your <span className="hl">{ownData ? "data" : "wells"}</span><br />anything.</h2>
+                  <p className="mx-auto mt-4 max-w-md text-center text-[15px] text-muted">{ownData
+                    ? "Attach a CSV, Excel, PDF or document with the paperclip (or drop it here), then ask. Every number comes back with the records behind it."
+                    : "Status, downtime, spills, duties. Answers come back as a figure you can touch, with the records behind every number."}</p>
                   <div className="mt-8">{composer}</div>
                   <div className="mt-5 flex flex-wrap justify-center gap-2">
-                    {SCENARIOS.slice(0, 4).map((s) => (
+                    {ownData ? <>
+                      <button type="button" onClick={() => fileRef.current?.click()} className={chip}>Upload a file</button>
+                      {STARTERS.map((q) => <button key={q} type="button" onClick={() => submit(q)} className={chip}>{q}</button>)}
+                    </> : SCENARIOS.slice(0, 4).map((s) => (
                       <button key={s.id} type="button" onClick={() => submit(s.question, MOCK ? s.id : undefined)} data-testid={`suggest-${s.id}`} title={s.question}
-                        className="rounded-full border border-line bg-panel px-3.5 py-1.5 text-[13px] transition hover:border-fg">{s.label}</button>
+                        className={chip}>{s.label}</button>
                     ))}
                   </div>
                 </div>
@@ -278,7 +292,13 @@ export function Shell({ account }: { account?: { email: string; onSignOut: () =>
             </div>
           </div>
 
-          {turns.length > 0 && <div className="mx-auto w-full max-w-[720px] px-4 pb-4">{composer}</div>}
+          {turns.length > 0 && <div className="mx-auto w-full max-w-[720px] px-4 pb-4">
+            {!busy && nextUp.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-2" aria-label="Suggested follow-ups">
+                {nextUp.map((q) => <button key={q} type="button" onClick={() => submit(q)} className={chip}>{q}</button>)}
+              </div>
+            )}
+            {composer}</div>}
         </main>
 
         <CompareDock open={compareOpen && !xrayDesktop} onClose={() => setCompareOpen(false)} />

@@ -6,11 +6,11 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-import wellops.skills as K
-from wellops import mcp_server
-from wellops.settings import settings
-from wellops.skills import distill as D
-from wellops.skills import store as S
+import kreatwit.skills as K
+from kreatwit import mcp_server
+from kreatwit.settings import settings
+from kreatwit.skills import distill as D
+from kreatwit.skills import store as S
 
 Q6 = "Which 3 wells in Northeast Block 7 had the most downtime in the last 4 months? Show a bar chart."
 Q6_CALLS = [
@@ -160,12 +160,12 @@ def test_on_turn_complete_uses_call_log_and_never_raises(deps):
 def test_skill_tools_registered_and_rest_api():
     names = {t.name for t in mcp_server.mcp._tool_manager.list_tools()}
     assert {"find_skills", "get_skill"} <= names
-    from wellops.skills.server import skills_mcp
+    from kreatwit.skills.server import skills_mcp
     assert {t.name for t in skills_mcp._tool_manager.list_tools()} == {
         "list_skills", "get_skill", "find_skills", "create_skill", "record_outcome", "export_skill_md"}
     assert json.loads(mcp_server.get_skill(None, "well-status"))["skill_id"] == "well-status"
 
-    from wellops.api import app as api
+    from kreatwit.api import app as api
     c = TestClient(api.app)
     assert any(s["skill_id"] == "downtime-analysis" for s in c.get("/api/skills").json())
     r = c.post("/api/skills", json={"name": "rank-spills", "description": "Areas ranked by spill count",

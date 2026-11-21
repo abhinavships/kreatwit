@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "WellOps eval case (multi-turn, multi-principal episode)",
+  "title": "Kreatwit eval case (multi-turn, multi-principal episode)",
   "type": "object",
   "required": ["id", "suite", "title", "turns"],
   "additionalProperties": false,

@@ -102,7 +102,7 @@ def main(argv=None) -> int:
             print("[opik] OPIK_API_KEY / OPIK_WORKSPACE not set: running offline, results written to JSON only", file=sys.stderr)
         else:
             ev, results = opik_sink.run_experiment(
-                client, dataset_name=f"wellops-{a.suite}", cases=cases, runner=runner, k=a.k,
+                client, dataset_name=f"kreatwit-{a.suite}", cases=cases, runner=runner, k=a.k,
                 experiment_name=f"{a.target}-{a.suite}-{run_id}", project=a.project or opik_sink.PROJECT,
                 config=dict(target=a.target, suite=a.suite, k=a.k, run_id=run_id))
             opik_url = getattr(ev, "experiment_url", None) or getattr(ev, "url", None)

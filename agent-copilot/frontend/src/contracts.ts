@@ -1,5 +1,5 @@
 /**
- * TS mirror of backend/src/wellops/contracts/__init__.py. Keep in sync; change only with a DECISIONS.md note.
+ * TS mirror of backend/src/kreatwit/contracts/__init__.py. Keep in sync; change only with a DECISIONS.md note.
  * (pydantic `X | None = None` => optional + nullable here; defaults => optional.)
  */
 
@@ -95,13 +95,13 @@ export interface AnswerSpec {
 }
 
 // ---- Custom AG-UI events -------------------------------------------------------------------------------------
-export const CUSTOM_EVENTS = ["wellops.answer", "wellops.verification", "wellops.capability", "wellops.conflict", "wellops.usage"] as const;
+export const CUSTOM_EVENTS = ["kreatwit.answer", "kreatwit.verification", "kreatwit.capability", "kreatwit.conflict", "kreatwit.usage"] as const;
 
 /** api.app._verification: the last verifier attempt; retries = attempts - 1. */
 export interface VerificationGate { name: string; ok: boolean; detail?: string | null }
 export interface VerificationEvent { ok?: boolean; gates: VerificationGate[]; retries: number; trace_url?: string }
 export interface CapabilityEvent { kind: string; name: string; action: string; path?: string | null; [k: string]: unknown }
-/** wellops.usage (api.app): tokens and model; cost/trace are optional extras. */
+/** kreatwit.usage (api.app): tokens and model; cost/trace are optional extras. */
 export interface UsageEvent {
   input_tokens?: number | null; output_tokens?: number | null; cost_usd?: number; model?: string | null; trace_url?: string;
 }

@@ -16,3 +16,6 @@ agent-copilot/backend/uploads/
 # local backups / tooling (may hold real keys)
 *.bak
 .claude/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal

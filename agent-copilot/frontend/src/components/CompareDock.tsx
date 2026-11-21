@@ -8,7 +8,7 @@ import { clear, close, pin, setCanvasOpen, sourceKey, update, useBoard, type Boa
 import { titleCase } from "@/lib/format";
 import { CanvasMenu } from "@/components/CanvasMenu";
 
-export const DRAG_MIME = "application/x-wellops-visual";
+export const DRAG_MIME = "application/x-kreatwit-visual";
 export type DragPayload = { chatId: string; visual: Visual; conflicts?: AnswerSpec["conflicts"] };
 
 /** Start a drag of a generated figure toward the compare dock. */

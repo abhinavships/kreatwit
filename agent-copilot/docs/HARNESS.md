@@ -1,9 +1,9 @@
-# WellOps as harness engineering
+# Kreatwit as harness engineering
 
 Framing: [Harness Engineering primer (aman.ai)](https://aman.ai/primers/harness-engineering/). The primer defines a
 harness as the software layer around a foundation model: prompts and skills, tools, memory and context, state,
 verification, retries, routing and control flow. Its core loop is *run tasks → collect traces → diagnose failures →
-modify the stack → re-evaluate*. This page maps WellOps onto it.
+modify the stack → re-evaluate*. This page maps Kreatwit onto it.
 
 ## 1. Score = Eval(M, H, E, B): we report configs, not models
 
@@ -12,24 +12,24 @@ tool retries 2). We hold H, E and B fixed and change M. Results belong to a mode
 
 | Config (M + same H) | Live result |
 |---|---|
-| `ollama:gemma4-e2b-32k` + WellOps H | Failed both cases that completed: Q01 and Q06 ran out of verifier retries. Q13 never ran. |
-| `openrouter:nvidia/nemotron-3-super-120b-a12b:free` + WellOps H | Q1 passed all 6 gates on the first attempt (~30 s). |
+| `ollama:gemma4-e2b-32k` + Kreatwit H | Failed both cases that completed: Q01 and Q06 ran out of verifier retries. Q13 never ran. |
+| `openrouter:nvidia/nemotron-3-super-120b-a12b:free` + Kreatwit H | Q1 passed all 6 gates on the first attempt (~30 s). |
 
 The harness doesn't make a 2B model correct. It makes a wrong answer fail loudly instead of reaching the user.
 
 ## 2. Frozen substrate vs editable layers (the primer's three strata)
 
-| Stratum | WellOps |
+| Stratum | Kreatwit |
 |---|---|
-| **Frozen substrate** | L0 DuckDB built by deterministic ingest (`backend/src/wellops/substrate/ingest.py`). Rules are in `substrate/rules.yaml`, each with a verbatim quote from its manual or SOP. Data-quality flags are in the `dq_flags` table. The agent can read these but never write them. |
-| **Editable research code** | Typed tools (`backend/src/wellops/tools/`) and 9 playbook skills (`skills/*/SKILL.md`, loaded by progressive disclosure through `list_skills` / `load_skill`). |
-| **Instruction layer** | `backend/src/wellops/agent/prompt.py`: objectives, the citation and disclosure contract, failure handling. |
+| **Frozen substrate** | L0 DuckDB built by deterministic ingest (`backend/src/kreatwit/substrate/ingest.py`). Rules are in `substrate/rules.yaml`, each with a verbatim quote from its manual or SOP. Data-quality flags are in the `dq_flags` table. The agent can read these but never write them. |
+| **Editable research code** | Typed tools (`backend/src/kreatwit/tools/`) and 9 playbook skills (`skills/*/SKILL.md`, loaded by progressive disclosure through `list_skills` / `load_skill`). |
+| **Instruction layer** | `backend/src/kreatwit/agent/prompt.py`: objectives, the citation and disclosure contract, failure handling. |
 
 ## 3. Separate generation from verification
 
 - **Generation:** the Pydantic AI agent produces an `AnswerSpec` with markdown, claims bound to result handles, visuals,
   citations and assumptions.
-- **Verification:** `backend/src/wellops/verify/gates.py` runs as the `output_validator`. It checks 6 gates: grounding,
+- **Verification:** `backend/src/kreatwit/verify/gates.py` runs as the `output_validator`. It checks 6 gates: grounding,
   claims (re-executed against the handle), disclosure, conflicts, visual_fit and assumptions. A failure becomes a
   `ModelRetry` with a diff of what's wrong, at most 2 retries (`MAX_RETRIES`), and then the turn fails.
 - **Evaluators are outside the agent's reach:** `evals/` is a separate project with its own truth computation and

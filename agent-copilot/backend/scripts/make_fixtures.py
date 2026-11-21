@@ -1,13 +1,13 @@
 """Build the frontend mock fixtures from real tool output (no LLM).
 
 Each scenario replays what the agent would do for one example question in dataset/03-evaluation-queries.md:
-resolve entities, call the data tools in backend/src/wellops/tools/, then compose an AnswerSpec whose prose,
+resolve entities, call the data tools in backend/src/kreatwit/tools/, then compose an AnswerSpec whose prose,
 claims and visuals are derived from the returned rows. Every AnswerSpec is checked by the real L4 verifier and
 the gate results are written with it. No answer value is typed in by hand; the question text is the only input.
 
 Run against a private copy of the database (the API server holds the lock on the default one):
-    cd backend && DB_PATH=/tmp/wellops_7b.duckdb uv run python -m wellops.substrate.ingest
-    DB_PATH=/tmp/wellops_7b.duckdb uv run python scripts/make_fixtures.py [out.json]
+    cd backend && DB_PATH=/tmp/kreatwit_7b.duckdb uv run python -m kreatwit.substrate.ingest
+    DB_PATH=/tmp/kreatwit_7b.duckdb uv run python scripts/make_fixtures.py [out.json]
 The correction in Q12 is written to that copy, never to the shared database.
 """
 
@@ -21,11 +21,11 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from wellops import memory, tools
-from wellops.contracts import AnswerSpec, AssertionIn, Citation, Claim, Conflict, RunDeps, Visual
-from wellops.settings import ROOT, settings
-from wellops.tools.core import ID_RE, ToolOut, cite_kind, get_db, store
-from wellops.verify import verify
+from kreatwit import memory, tools
+from kreatwit.contracts import AnswerSpec, AssertionIn, Citation, Claim, Conflict, RunDeps, Visual
+from kreatwit.settings import ROOT, settings
+from kreatwit.tools.core import ID_RE, ToolOut, cite_kind, get_db, store
+from kreatwit.verify import verify
 
 OUT = ROOT / "frontend" / "src" / "mock" / "fixtures.json"
 CHAT = "fixtures"  # one chat for every scenario, so handles r1..rN are unique across the fixture set
@@ -439,7 +439,7 @@ def records(scenarios: list[dict]) -> dict[str, dict]:
 
 def main() -> None:
     out = Path(sys.argv[1]) if len(sys.argv) > 1 else OUT
-    if Path(settings.db_path).resolve() == (ROOT / "backend" / "wellops.duckdb").resolve():
+    if Path(settings.db_path).resolve() == (ROOT / "backend" / "kreatwit.duckdb").resolve():
         sys.exit("refusing to write the Q12 correction into the shared database; set DB_PATH to a private copy")
     db = get_db()
     db.run("DELETE FROM handles WHERE chat_id=?", [CHAT])

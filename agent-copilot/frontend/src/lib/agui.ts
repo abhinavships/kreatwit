@@ -45,7 +45,7 @@ async function* mockRun(input: RunAgentInput, signal: AbortSignal): AsyncGenerat
     yield { type: "TEXT_MESSAGE_START", messageId: mid, role: "assistant" };
     for (const w of MOCK_CHAT_FOLLOWUP.split(/(\s+)/)) { await sleep(15, signal); yield { type: "TEXT_MESSAGE_CONTENT", messageId: mid, delta: w }; }
     yield { type: "TEXT_MESSAGE_END", messageId: mid };
-    yield { type: "CUSTOM", name: "wellops.answer", value: { markdown: MOCK_CHAT_FOLLOWUP, assumptions: ["Mock mode"] } };
+    yield { type: "CUSTOM", name: "kreatwit.answer", value: { markdown: MOCK_CHAT_FOLLOWUP, assumptions: ["Mock mode"] } };
     yield { type: "RUN_FINISHED" };
     return;
   }

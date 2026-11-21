@@ -1,4 +1,4 @@
-"""Contract with the real backend stream (fixture captured from backend/src/wellops/api/app.py with a scripted model)."""
+"""Contract with the real backend stream (fixture captured from backend/src/kreatwit/api/app.py with a scripted model)."""
 import json
 from pathlib import Path
 
@@ -20,7 +20,7 @@ def test_parse_real_stream():
     assert [c["name"] for c in trace] == ["well_status"]  # output tool kept out of the trajectory
     assert trace[0]["args"] == {"scope": {"kind": "wells", "ids": ["WELL-0175"]}} and trace[0]["result"]["handle"] == "r1"
     m = ans["_meta"]
-    assert m["output_attempts"] == 1 and m["events"]["wellops.verification"][0]["ok"]
+    assert m["output_attempts"] == 1 and m["events"]["kreatwit.verification"][0]["ok"]
 
 
 MW = {"kind": "status_claim", "scope": "well", "key": "WELL-0175"}

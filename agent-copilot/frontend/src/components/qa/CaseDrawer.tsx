@@ -87,7 +87,7 @@ function TurnView({ t, i, cats }: { t: QaTurn; i: number; cats: QaCategory[] }) 
   const a = t.answer ?? {};
   const meta = (a._meta ?? {}) as Record<string, unknown>;
   const events = (meta.events ?? {}) as Record<string, unknown[]>;
-  const gates = ((events["wellops.verification"]?.[0] ?? null) as { gates?: { name: string; ok: boolean; detail?: string | null }[]; retries?: number } | null);
+  const gates = ((events["kreatwit.verification"]?.[0] ?? null) as { gates?: { name: string; ok: boolean; detail?: string | null }[]; retries?: number } | null);
   const scorers = SCORER_ORDER.filter((n) => t.scores[n]).map((n) => [n, t.scores[n]] as const);
   return (
     <li className="turn-in rounded-xl border border-line bg-panel/90 p-4">

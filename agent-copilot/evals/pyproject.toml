@@ -1,7 +1,7 @@
 [project]
-name = "wellops-evals"
+name = "kreatwit-evals"
 version = "0.1.0"
-description = "Evaluation system for the WellOps Asset Intelligence Copilot (Opik-centred)"
+description = "Evaluation system for the Kreatwit Asset Intelligence Copilot (Opik-centred)"
 requires-python = ">=3.12"
 dependencies = [
     "httpx>=0.28.1",
@@ -9,7 +9,7 @@ dependencies = [
     "opik>=2.2.103",
     "python-dotenv>=1.2.4",
     "pyyaml>=6.0.3",
-    "wellops",
+    "kreatwit",
 ]
 
 [build-system]
@@ -28,4 +28,4 @@ dev = [
 testpaths = ["tests"]
 
 [tool.uv.sources]
-wellops = { path = "../backend", editable = true }
+kreatwit = { path = "../backend", editable = true }

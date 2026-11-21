@@ -1,0 +1,353 @@
+"""Kreatwit tools as an MCP server (streamable HTTP, mounted in the API process so it shares the DuckDB handle).
+
+The in-process agent calls these same functions directly (session context in a contextvar); external MCP clients
+(Claude Desktop, Cursor, other agents) connect over HTTP with X-User-Id / X-Chat-Id / X-Clock-Today headers.
+Session context is never a model argument.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import contextvars
+import json
+from datetime import date
+from typing import Any, Literal
+
+from mcp.server.fastmcp import Context, FastMCP
+
+from kreatwit import memory, tools
+from kreatwit.contracts import AssertionIn, RunDeps, Visual
+from kreatwit.settings import settings
+from kreatwit.tools.core import Scope, ToolError
+
+mcp = FastMCP("kreatwit", stateless_http=True, json_response=True)
+mcp.settings.streamable_http_path = "/"
+
+MEASURES = ["downtime_days", "spill_count", "spills", "total_volume_bbl", "volume_bbl", "cost_usd", "total_cost_usd",
+            "delta_c", "wellhead_c", "count", "n"]  # preferred y columns, most specific first
+UI_QUEUE: dict[str, list[Visual]] = {}  # chat_id -> visuals the agent asked to show this turn
+TOOL_LOG: dict[str, list[Any]] = {}  # chat_id -> ToolOut results this turn (for the verifier)
+CALL_LOG: dict[str, list[dict]] = {}  # chat_id -> [{"name", "args"}] this turn (skills.on_turn_complete distills it)
+PREVIEW_ROWS = 25
+
+
+CURRENT: contextvars.ContextVar[RunDeps | None] = contextvars.ContextVar("kreatwit_deps", default=None)  # in-process agent
+
+
+def _deps(ctx: Context | None) -> RunDeps:
+    if (d := CURRENT.get()) is not None:  # called in-process by the native agent: session context set by the API
+        return d
+    h = ctx.request_context.request.headers if ctx.request_context.request else {}
+    return RunDeps(principal=h.get("x-user-id") or "U-201", chat_id=h.get("x-chat-id") or "default",
+                   today=date.fromisoformat(h.get("x-clock-today") or str(settings.clock_today)),
+                   active_dataset=settings.active_dataset)
+
+
+def _out(ctx: Context, fn, *a, **k) -> str:
+    deps = _deps(ctx)
+    try:
+        r = fn(deps, *a, **k)
+    except ToolError as e:
+        return json.dumps({"error": str(e)})
+    if hasattr(r, "handle"):
+        TOOL_LOG.setdefault(deps.chat_id, []).append(r)
+        d = r.model_dump(mode="json")
+        if d.get("row_count", 0) > 40:  # small results go to the model whole: counts are never read off a preview
+            d["preview"] = d.get("preview", [])[:PREVIEW_ROWS]
+        else:
+            from kreatwit.tools.core import store
+            st = store().get(deps.chat_id, r.handle)
+            d["preview"] = st.rows if st else d.get("preview", [])
+        d["citations"] = d.get("citations", [])[:15]
+        return json.dumps(d, default=str)
+    return json.dumps(r.model_dump(mode="json") if hasattr(r, "model_dump") else r, default=str)
+
+
+ScopeT = Scope | str | list[str] | None
+
+
+@mcp.tool()
+def resolve_entity(ctx: Context, text: str) -> str:
+    """Map text to ids: wells, areas ("Northeast Block 8"), users, well types, INS-/MNT- ids, and relative dates
+    ("last 4 months") as start/end windows against today. Call this first for areas and relative periods."""
+    return _out(ctx, tools.resolve_entity, text)
+
+
+@mcp.tool()
+def well_status(ctx: Context, scope: ScopeT = None, at_date: str | None = None,
+                only: Literal["producing", "not_producing"] | None = None) -> str:
+    """Current status per well from its latest inspection: delta vs threshold, producing flag, reason_summary.
+    scope: {"kind": "wells"|"area"|"well_type"|"all", "ids": [...]}, or a well id / area name string."""
+    return _out(ctx, tools.well_status, scope, at_date, only)
+
+
+@mcp.tool()
+def inspection_series(ctx: Context, well: str, start: str | None = None, end: str | None = None) -> str:
+    """Inspection readings of one well over time (ambient, wellhead, delta, producing). Dates YYYY-MM-DD."""
+    return _out(ctx, tools.inspection_series, well, start, end)
+
+
+@mcp.tool()
+def downtime(ctx: Context, scope: ScopeT = None, start: str | None = None, end: str | None = None,
+             group_by: Literal["well", "area", "well_type", "month", "year", "area_month", "none"] | None = None,
+             top_k: int | None = None) -> str:
+    """Downtime days = 7 x non-producing inspections. Grouped/ranked. Use resolve_entity for the window."""
+    return _out(ctx, tools.downtime, scope, start, end, group_by, top_k)
+
+
+@mcp.tool()
+def spills(ctx: Context, scope: ScopeT = None, start: str | None = None, end: str | None = None,
+           group_by: Literal["well", "area", "month", "area_month", "none"] | None = None) -> str:
+    """Real spills (corrected detections excluded) with class, volume, lat/lon; group_by gives counts."""
+    return _out(ctx, tools.spills, scope, start, end, True, group_by)
+
+
+@mcp.tool()
+def obligations(ctx: Context, scope: ScopeT = None, start: str | None = None, end: str | None = None) -> str:
+    """SOP/manual duties (spill notices, containment, NOV answers, RCA...) as met|breached|pending with due dates."""
+    return _out(ctx, tools.obligations, scope, start, end)
+
+
+@mcp.tool()
+def rca_candidates(ctx: Context, scope: ScopeT = None, equipment_kind: str | None = None) -> str:
+    """Wells needing root-cause analysis (repeat corrective repairs on one equipment kind in 12 months)."""
+    return _out(ctx, tools.rca_candidates, scope, equipment_kind, False)
+
+
+@mcp.tool()
+def repair_costs(ctx: Context, scope: ScopeT = None, start: str | None = None, end: str | None = None,
+                 group_by: Literal["well", "area", "equipment_kind", "maintenance_type", "month", "year", "none"] = "well") -> str:
+    """Repair cost by start date, grouped."""
+    return _out(ctx, tools.repair_costs, scope, start, end, group_by, None)
+
+
+@mcp.tool()
+def evidence_chain(ctx: Context, id: str) -> str:
+    """Evidence for an INS-/MNT-/REG-/CTX- id: inspection, repair, report spans, regulatory events, notes, conflicts."""
+    return _out(ctx, tools.evidence_chain, id)
+
+
+@mcp.tool()
+def read_doc(ctx: Context, doc_id: str, section: str | None = None) -> str:
+    """Read a manual/SOP section verbatim (OM-T200, OM-T350, SOP-SR, SOP-RC, SOP-WS, uploaded UP-*)."""
+    return _out(ctx, tools.read_doc, doc_id, section)
+
+
+@mcp.tool()
+def search_docs(ctx: Context, query: str) -> str:
+    """Keyword search in manuals, SOPs and uploaded documents."""
+    return _out(ctx, tools.search_docs, query, None)
+
+
+@mcp.tool()
+def search_knowledge(ctx: Context, query: str, k: int = 6, asset_id: str | None = None, kind: str | None = None,
+                     start: str | None = None, end: str | None = None) -> str:
+    """Find verbatim passages that answer WHY / "what does the manual or SOP say" / "what did the report or notes
+    say" questions: manuals and SOPs (by section), maintenance report text (with char spans), operator notes and
+    inspection notes, uploaded documents and image captions. Hybrid keyword + semantic ranking; each hit carries a
+    citation (doc §section, MNT id + span, CTX/INS id). Filters: asset_id (WELL-0151; manuals stay eligible),
+    kind (doc | report | note | media), start/end (YYYY-MM-DD). Quote the snippet and cite its id; use the typed
+    tools, not this, for counts, statuses and numbers over time."""
+    from kreatwit import rag
+    return _out(ctx, rag.search_knowledge, query, k, asset_id, kind, start, end)
+
+
+@mcp.tool()
+def find_skills(ctx: Context, question: str, k: int = 3) -> str:
+    """Learned playbooks for this kind of question: ordered tool calls with {slot} arguments, the visual, and
+    pitfalls, ranked by fit and success rate. Optional: call first for multi-step questions, then follow the steps."""
+    from kreatwit import skills
+    return json.dumps(skills.find_skills(question, k), default=str)
+
+
+@mcp.tool()
+def get_skill(ctx: Context, skill_id: str) -> str:
+    """One playbook by id (from find_skills): full steps, pitfalls and example questions."""
+    from kreatwit import skills
+    return json.dumps(skills.get_skill(skill_id) or {"error": f"unknown skill {skill_id!r}"}, default=str)
+
+
+@mcp.tool()
+def gas_response_check(ctx: Context, since: str = "2026-11-01") -> str:
+    """Operations SOP OPS-1: every operator-note gas report (smell, rotten egg, odor, H2S alarm) since a date, the first
+    field response (maintenance start or MANUAL inspection), hours to it, the deadline and Met/Missed. Use for gas reports."""
+    from kreatwit.tools import sop_rules
+    return _out(ctx, sop_rules.gas_response, since)
+
+
+@mcp.tool()
+def bypass_check(ctx: Context) -> str:
+    """Operations SOP OPS-2: every temporary flowline bypass (in/out dates from operator notes) against the MOC memos,
+    with approval, expiry and Allowed/Expired/Not approved; in_place_now marks the ones still in."""
+    from kreatwit.tools import sop_rules
+    return _out(ctx, sop_rules.bypasses)
+
+
+@mcp.tool()
+def status_conflicts(ctx: Context) -> str:
+    """Operations SOP OPS-3: wells whose latest inspection and latest shut-in/restart operator note disagree, with the
+    real status now and why. Use for 'which status is right' / inspection vs operator notes questions."""
+    from kreatwit.tools import sop_rules
+    return _out(ctx, sop_rules.status_conflicts)
+
+
+@mcp.tool()
+def recalled_pumps(ctx: Context, team: str | None = None) -> str:
+    """Supplier recall: wells whose pump in the ground TODAY is from a recalled lot (latest 'Parts installed'), with area,
+    team, install job, install cost and any user statements about the well (attributed). team: team id or area name."""
+    from kreatwit.tools import sop_rules
+    return _out(ctx, sop_rules.recalled_pumps, team)
+
+
+@mcp.tool()
+def spill_cleanup_compliance(ctx: Context, areas: list[str] | None = None, since: str = "2026-06-01", min_bbl: float = 5.0,
+                             required: str = "Soil samples sent to the lab.") -> str:
+    """Regulator letters about spill clean-up: reportable spills in the given areas (names) since a date, their clean-up
+    job and whether its report contains the required sentence (Compliant Yes/No with reason). Read the letter first for
+    the areas, date, volume and sentence."""
+    from kreatwit.tools import sop_rules
+    return _out(ctx, sop_rules.spill_cleanup_compliance, areas, since, min_bbl, required)
+
+
+@mcp.tool()
+def shut_in_waits(ctx: Context, start: str = "2026-01-01", end: str | None = None) -> str:
+    """Why wells stay shut in longer than the repair: per area and reason (parts, weather, crews, contractors, pipeline
+    tie-in, none recorded), share of jobs and typical extra days, for jobs started in [start, end]."""
+    from kreatwit.tools import sop_rules
+    return _out(ctx, sop_rules.shut_in_waits, start, end)
+
+
+@mcp.tool()
+def freeze_check(ctx: Context, start: str = "2026-12-01", end: str = "2026-12-31") -> str:
+    """Operations SOP OPS-5 cold weather: cold producing readings and whether the heat trace check followed in time."""
+    from kreatwit.tools import sop_rules
+    return _out(ctx, sop_rules.freeze_checks, start, end)
+
+
+@mcp.tool()
+def sql(ctx: Context, query: str) -> str:
+    """Read-only SQL (SELECT/WITH). Use {ds} and {asof} placeholders. Prefer the typed tools above."""
+    return _out(ctx, tools.sql, query, "entity_list")
+
+
+@mcp.tool()
+def remember_correction(ctx: Context, kind: str, scope_level: str, scope_key: str, target_attr: str | None = None,
+                        value_num: float | None = None, value_text: str | None = None, reason: str | None = None) -> str:
+    """Commit user feedback (attributed, undoable): value_correction (scope inspection, target_attr, value_num),
+    rule_override (scope well_type|area|well|fleet, target_attr = rule param), status_claim, shared_fact."""
+    return _out(ctx, memory.assert_fact, AssertionIn(kind=kind, scope_level=scope_level, scope_key=scope_key,
+                                                      target_attr=target_attr, value_num=value_num,
+                                                      value_text=value_text, reason=reason))
+
+
+@mcp.tool()
+def propose_correction(ctx: Context, record_id: str, changes: dict[str, Any], reason: str | None = None,
+                       date: str | None = None) -> str:
+    """The user says recorded data is wrong or gives corrected values. Pass EVERY field they changed in one call:
+    changes = {"wellhead_temp_c": 41.0, "ambient_temp_c": 19.9, "spill_est_volume_bbl": 5.4, "spill": false,
+    "producing": "producing", "delta_c": ..., "delta_min_c": ...}. record_id: INS- id, or a well id (+ date YYYY-MM-DD
+    for a specific day's inspection). reason: the user's justification, verbatim ("thermal gun was faulty; re-measured").
+    Each field is checked against column constraints: invalid values (non-numbers, "infinity", implausible) are
+    rejected; computed fields (Δ, threshold, margin) are explained; justified valid changes are applied now (attributed,
+    original kept); unjustified ones wait for the user's confirmation; status statements are recorded as claims and
+    checked against the data. A proof card with the evidence is shown automatically. Then say in 1-2 sentences what
+    was applied, rejected or needs confirmation, and name any conflicting note (author + text)."""
+    from kreatwit.memory.disputes import propose_correction as fn
+    deps = _deps(ctx)
+    try:
+        d = fn(deps, record_id, changes, reason, date)
+    except ToolError as e:
+        return json.dumps({"error": str(e)})
+    UI_QUEUE.setdefault(deps.chat_id, []).append(Visual(type="dispute", title=f"Proof · {d['record']['id']}", encodings=d))
+    return json.dumps({k: d[k] for k in ("dispute_id", "record", "changes", "conflicts", "effects", "ask")}, default=str)
+
+
+@mcp.tool()
+def recall_conversations(ctx: Context, query: str) -> str:
+    """Earlier conversations of THIS user (e.g. 'the wells we discussed yesterday')."""
+    return _out(ctx, memory.recall_episodes, query, None)
+
+
+@mcp.tool()
+def ingest_file(ctx: Context, path: str) -> str:
+    """Ingest a local file into Kreatwit (CSV/XLSX/JSON -> tables, MD/PDF -> docs and rules, images -> media)."""
+    from kreatwit.tools.ingest_tools import ingest_file_tool
+    return _out(ctx, ingest_file_tool, path)
+
+
+@mcp.tool()
+def analyze_image(ctx: Context, media_id: str, question: str | None = None) -> str:
+    """Describe or answer a question about an uploaded image (site photo, gauge, document scan) by media id."""
+    from kreatwit.tools.ingest_tools import analyze_image as fn
+    return _out(ctx, fn, media_id, question)
+
+
+@mcp.tool()
+def list_media(ctx: Context, asset_id: str | None = None) -> str:
+    """Uploaded images (optionally for one well) with captions."""
+    from kreatwit.tools.ingest_tools import list_media as fn
+    return _out(ctx, fn, asset_id)
+
+
+@mcp.tool()
+def user_tables(ctx: Context) -> str:
+    """Tables created from uploaded data files, with columns; query them with the sql tool."""
+    from kreatwit.ingest.pipeline import user_tables_catalog
+    return json.dumps(user_tables_catalog(), default=str)
+
+
+@mcp.tool()
+def generate_image(ctx: Context, prompt: str, width: int = 768, height: int = 512) -> str:
+    """Create an image from a text prompt (illustrations, site diagrams, report covers). Then call
+    show_visual(type="image", title=<prompt>, handle=<media_id>) to display it."""
+    from kreatwit.tools.media_gen import generate_image as gen
+    r = gen(_deps(ctx), prompt, width, height)
+    deps = _deps(ctx)
+    UI_QUEUE.setdefault(deps.chat_id, []).append(Visual(type="image", title=prompt[:80], encodings={"src": r["url"]}))
+    return json.dumps(r)
+
+
+VisualT = Literal["status_card", "table", "line", "bar", "map", "heatmap", "obligation_timeline", "evidence_chain",
+                  "conflict_card", "correction_diff", "dispute", "sources", "kpi", "gauge", "timeline", "image", "ingest_report", "none"]
+
+
+@mcp.tool()
+def show_visual(ctx: Context, type: VisualT, handle: str | None = None, title: str | None = None,
+                x: str | None = None, y: str | None = None, series: list[str] | None = None) -> str:
+    """Render generative UI from a tool result handle (e.g. "r2"). If the user named a visual, use it. Otherwise:
+    one well right now -> status_card; a list of wells/events/spills/repairs/rules/obligations -> table; a value over
+    time -> line; comparing a few wells or areas -> bar; where things are -> map; area x month -> heatmap.
+    A single total needs no visual. Call once, after the data tool."""
+    deps = _deps(ctx)
+    st = tools.store().get(deps.chat_id, handle) if handle else None
+    if st and st.rows and type == "line" and not y and {"wellhead_c", "ambient_c"} <= set(st.result.columns):
+        y_list = ["wellhead_c", "ambient_c"]
+        UI_QUEUE.setdefault(deps.chat_id, []).append(Visual(type=type, handle=handle, title=title or "Wellhead vs air (°C)",
+                                                            encodings={"x": x or "inspected_at", "y": y_list}))
+        return json.dumps({"ok": True, "shown": type, "handle": handle})
+    if st and st.rows and type in ("bar", "kpi", "gauge"):
+        cols, row = st.result.columns, st.rows[0]
+        nums = [c for c in cols if isinstance(row.get(c), (int, float)) and not isinstance(row.get(c), bool)]
+        if not y or y not in cols:  # the measure the question is about, not the first numeric column
+            y = next((c for c in MEASURES if c in nums), nums[-1] if nums else None)
+        if not x or x not in cols:
+            x = next((c for c in cols if c not in nums), None)
+        if not title and y:
+            title = y.replace("_", " ").capitalize() + (f" by {x.replace('_', ' ')}" if x else "")
+    enc = {k: v for k, v in {"x": x, "y": y, "series": series}.items() if v}
+    UI_QUEUE.setdefault(deps.chat_id, []).append(Visual(type=type, handle=handle, title=title, encodings=enc))
+    return json.dumps({"ok": True, "shown": type, "handle": handle})
+
+
+def install(app) -> None:
+    """Mount at /mcp and run the MCP session manager inside the app lifespan."""
+    inner = app.router.lifespan_context
+
+    @contextlib.asynccontextmanager
+    async def lifespan(a):
+        async with mcp.session_manager.run():
+            async with inner(a) as state:
+                yield state
+
+    app.router.lifespan_context = lifespan
+    app.mount("/mcp", mcp.streamable_http_app())

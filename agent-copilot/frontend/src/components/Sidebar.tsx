@@ -1,24 +1,39 @@
 "use client";
 import { useState } from "react";
 import type { ChatSummary, User } from "@/contracts";
+import Link from "next/link";
+import type { Account } from "@/lib/auth";
 import { roleLabel, teamLabel } from "@/lib/format";
 
 export function Sidebar(p: {
-  users: User[]; userId: string; onUser: (id: string) => void; account?: { email: string; onSignOut: () => void };
+  users: User[]; userId: string; onUser: (id: string) => void; account?: Account;
   chats: ChatSummary[]; chatId: string; onChat: (id: string) => void; onNew: () => void;
-  today: string; resetToday?: string; onToday: (d: string) => void; mock: boolean;
+  today: string; resetToday?: string; onToday: (d: string) => void; mock: boolean; showClock?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const me = p.users.find((u) => u.user_id === p.userId);
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto p-3">
       <div className="flex items-center gap-2 px-1">
-        <span aria-hidden className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-sm font-bold text-accent-fg">W</span>
-        <div><div className="text-sm font-semibold leading-4">WellOps Copilot</div><div className="text-[11px] text-muted">Asset Intelligence{p.mock ? " · mock data" : ""}</div></div>
+        <span aria-hidden className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-sm font-bold text-accent-fg">K</span>
+        <div><div className="text-sm font-semibold leading-4">Kreatwit</div><div className="text-[11px] text-muted">Aletheia copilot{p.mock ? " · mock data" : ""}</div></div>
       </div>
 
+      {p.account ? (
+        <section aria-label="Signed in" className="rounded-lg border border-line bg-panel px-3 py-2">
+          <div className="truncate text-sm font-semibold">{p.account.member.name}</div>
+          <div className="truncate text-xs text-muted">
+            {p.account.member.title ? `${p.account.member.title} · ` : ""}{p.account.member.role} · {p.account.member.org_name}
+          </div>
+          <div className="mt-1 truncate text-[11px] text-muted">{p.account.email}</div>
+          <div className="mt-2 flex items-center justify-between gap-2 text-xs">
+            <Link href="/app/org/" className="font-medium underline hover:text-accent">Team &amp; settings</Link>
+            <button type="button" onClick={p.account.onSignOut} className="text-muted underline hover:text-fg">Sign out</button>
+          </div>
+        </section>
+      ) : (
       <section aria-label="User">
-        <h2 className="mb-1 px-1 text-[11px] font-semibold uppercase tracking-wide text-muted">{p.account ? "Signed in as" : "Acting as"}</h2>
+        <h2 className="mb-1 px-1 text-[11px] font-semibold uppercase tracking-wide text-muted">Acting as</h2>
         <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls="user-list"
           className="flex w-full items-center justify-between gap-2 rounded-lg border border-line bg-panel px-3 py-2 text-left hover:border-accent">
           <span className="min-w-0">
@@ -40,15 +55,10 @@ export function Sidebar(p: {
             ))}
           </ul>
         )}
-        {p.account && (
-          <div className="mt-1 flex items-center justify-between gap-2 px-1 text-xs text-muted">
-            <span className="truncate">{p.account.email}</span>
-            <button type="button" onClick={p.account.onSignOut} className="shrink-0 underline hover:text-fg">Sign out</button>
-          </div>
-        )}
       </section>
+      )}
 
-      <section aria-label="Clock">
+      {p.showClock !== false && <section aria-label="Clock">
         <label htmlFor="today" className="mb-1 block px-1 text-[11px] font-semibold uppercase tracking-wide text-muted">Today (simulated clock)</label>
         <input id="today" type="date" value={p.today} onChange={(e) => e.target.value && p.onToday(e.target.value)}
           className="w-full rounded-lg border border-line bg-panel px-3 py-1.5 text-sm" />
@@ -56,7 +66,7 @@ export function Sidebar(p: {
           <button type="button" onClick={() => p.onToday(addDays(p.today, 1))} className="rounded-md border border-line px-2 py-0.5 text-xs hover:border-accent">+1 day</button>
           <button type="button" onClick={() => p.onToday(p.resetToday ?? "2026-10-17")} className="rounded-md border border-line px-2 py-0.5 text-xs hover:border-accent">Reset</button>
         </div>
-      </section>
+      </section>}
 
       <section aria-label="Chats" className="min-h-0 flex-1">
         <div className="mb-1 flex items-center justify-between px-1">

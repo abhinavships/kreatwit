@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
-export const metadata: Metadata = { title: "WellOps", description: "Generative UI for fleet questions, grounded in the data." };
+export const metadata: Metadata = { title: "Kreatwit", description: "Aletheia: a copilot that answers only what it can prove from your company's data." };
 export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

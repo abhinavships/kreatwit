@@ -7,12 +7,12 @@ from datetime import date
 
 import pytest
 
-from wellops import rag
-from wellops.contracts import RunDeps
-from wellops.ingest import pipeline
-from wellops.rag import embed as E
-from wellops.rag.chunk import report_chunks
-from wellops.rag.index import embed_missing
+from kreatwit import rag
+from kreatwit.contracts import RunDeps
+from kreatwit.ingest import pipeline
+from kreatwit.rag import embed as E
+from kreatwit.rag.chunk import report_chunks
+from kreatwit.rag.index import embed_missing
 
 
 def fake_embed(texts: list[str]) -> list[list[float]]:

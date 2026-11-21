@@ -25,7 +25,7 @@ REFRESH_S = float(os.environ.get("QA_REFRESH_S", "5"))
 _lock = threading.Lock()
 _last_scan = 0.0
 
-app = FastAPI(title="WellOps QA explorer API", version="1.0")
+app = FastAPI(title="Kreatwit QA explorer API", version="1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"], allow_headers=["*"])
 
 

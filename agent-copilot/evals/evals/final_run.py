@@ -94,8 +94,8 @@ def main() -> None:
         rec = {"id": qid, "person": who, "user": U[who], "chat": chat, "session": session, "question": text,
                "seconds": round(time.time() - t0, 1), "error": err, "answer": ans.get("markdown", ""), "visuals": visuals,
                "tools": [{"name": c.get("name"), "args": c.get("args")} for c in trace],
-               "verification": (ev.get("wellops.verification") or [None])[-1],
-               "correctness": (ev.get("wellops.correctness") or [None])[-1]}
+               "verification": (ev.get("kreatwit.verification") or [None])[-1],
+               "correctness": (ev.get("kreatwit.correctness") or [None])[-1]}
         out.append(rec)
         ok = (rec["verification"] or {}).get("ok")
         print(f"{qid:5} {who:15} {rec['seconds']:6}s verified={ok} visuals={[v.get('type') for v in visuals]} "

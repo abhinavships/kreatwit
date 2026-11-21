@@ -1,4 +1,4 @@
-from wellops import tools as T
+from kreatwit import tools as T
 
 
 def rows(res):
@@ -124,7 +124,7 @@ def test_sql_guard(deps):
 
 
 def test_scope_accepts_what_small_models_send():
-    from wellops.tools.core import Scope
+    from kreatwit.tools.core import Scope
     assert Scope.model_validate('{"kind": "wells", "ids": ["WELL-0175"]}') == Scope(kind="wells", ids=["WELL-0175"])
     assert Scope.model_validate('{"kind": "wells"}') == Scope() == Scope.model_validate("all")
     assert Scope.model_validate("WELL-0007") == Scope(kind="wells", ids=["WELL-0007"])

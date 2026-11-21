@@ -14,9 +14,9 @@ export interface BoardCard {
   added: number;
 }
 
-const BASE = "wellops.board";
-const initialUser = () => { try { return localStorage.getItem("wellops.user") ?? "U-201"; } catch { return "U-201"; } };
-let KEY = ""; // set on first load from the remembered user; per user: `wellops.board.<userId>` (one user's canvas never shows for another)
+const BASE = "kreatwit.board";
+const initialUser = () => { try { return localStorage.getItem("kreatwit.user") ?? "U-201"; } catch { return "U-201"; } };
+let KEY = ""; // set on first load from the remembered user; per user: `kreatwit.board.<userId>` (one user's canvas never shows for another)
 const W = 460, H = 340, GAP = 20;
 let cards: BoardCard[] = [];
 let loaded = false;

@@ -24,11 +24,11 @@ data: {"type":"TOOL_CALL_END","timestamp":1792221348635,"toolCallId":"pyd_ai_1b4
 
 data: {"type":"TOOL_CALL_RESULT","timestamp":1792221348645,"messageId":"02c1c6db-8afe-463d-83dd-17102bf2fecf","toolCallId":"pyd_ai_1b4a3e18c00f420ab33c86a15b35d173","content":"Final result processed.","role":"tool"}
 
-data: {"type":"CUSTOM","name":"wellops.verification","value":{"ok":true,"retries":0,"gates":[{"name":"grounding","ok":true,"detail":null},{"name":"claims","ok":true,"detail":null},{"name":"disclosure","ok":true,"detail":null},{"name":"conflicts","ok":true,"detail":null},{"name":"visual_fit","ok":true,"detail":null},{"name":"assumptions","ok":true,"detail":null}]}}
+data: {"type":"CUSTOM","name":"kreatwit.verification","value":{"ok":true,"retries":0,"gates":[{"name":"grounding","ok":true,"detail":null},{"name":"claims","ok":true,"detail":null},{"name":"disclosure","ok":true,"detail":null},{"name":"conflicts","ok":true,"detail":null},{"name":"visual_fit","ok":true,"detail":null},{"name":"assumptions","ok":true,"detail":null}]}}
 
-data: {"type":"CUSTOM","name":"wellops.usage","value":{"input_tokens":100,"output_tokens":54,"model":"function:fn:stream"}}
+data: {"type":"CUSTOM","name":"kreatwit.usage","value":{"input_tokens":100,"output_tokens":54,"model":"function:fn:stream"}}
 
-data: {"type":"CUSTOM","name":"wellops.answer","value":{"markdown":"WELL-0175 is not producing: wellhead is 0.4 °C above air.","claims":[{"text":"0.4 °C","value":0.4,"handle":"r1","column":"delta_c","row_key":{"asset_id":"WELL-0175"}}],"visuals":[],"citations":[{"kind":"inspection","id":"INS-0175-0204","span":null,"label":null}],"conflicts":[],"applied_overlays":[],"assumptions":["as-of 2026-10-17, dataset sample"],"follow_ups":[]}}
+data: {"type":"CUSTOM","name":"kreatwit.answer","value":{"markdown":"WELL-0175 is not producing: wellhead is 0.4 °C above air.","claims":[{"text":"0.4 °C","value":0.4,"handle":"r1","column":"delta_c","row_key":{"asset_id":"WELL-0175"}}],"visuals":[],"citations":[{"kind":"inspection","id":"INS-0175-0204","span":null,"label":null}],"conflicts":[],"applied_overlays":[],"assumptions":["as-of 2026-10-17, dataset sample"],"follow_ups":[]}}
 
 data: {"type":"RUN_FINISHED","timestamp":1792221348648,"threadId":"cap1","runId":"8cd39ce8-e7a0-4b49-a80e-92178ac11bf2","outcome":{"type":"success"}}
 
