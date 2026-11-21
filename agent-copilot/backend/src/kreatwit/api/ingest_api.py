@@ -42,6 +42,8 @@ async def ingest(request: Request) -> dict:
     body = await request.body()
     if len(body) > limit:
         raise HTTPException(413, f"file larger than {limit // 2**20} MB")
+    from kreatwit import orgs
+    orgs.require("member")
     usage.take("uploads", settings.daily_uploads)
     name, data = _upload(body, request.headers.get("content-type", ""), request)
     with tempfile.TemporaryDirectory() as d:

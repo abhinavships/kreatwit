@@ -108,6 +108,9 @@ def _original(db: Db, deps: RunDeps, a: AssertionIn) -> float | None:
 
 
 def assert_fact(deps: RunDeps, a: AssertionIn) -> AssertionOut:
+    from kreatwit import orgs
+    if (m := orgs.MEMBER.get()) and orgs.rank(m["role"]) < orgs.rank("member"):
+        raise ToolError("you have view-only access in this organization: ask an admin for the member role to correct records")
     db = get_db()
     d = lit(deps.active_dataset)
     if a.scope_level == "inspection" and not db.rows(

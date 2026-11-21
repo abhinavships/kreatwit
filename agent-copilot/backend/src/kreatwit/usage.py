@@ -1,4 +1,4 @@
-"""Per-account daily caps (questions, uploads) for the public server. No-op outside a workspace (local dev, tests)."""
+"""Per-member daily caps (questions, uploads) for the public server. No-op outside a workspace (local dev, tests)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 from fastapi import HTTPException
 
-from kreatwit import workspace
+from kreatwit import orgs, workspace
 from kreatwit.settings import settings
 
 _LOCK = threading.Lock()
@@ -25,9 +25,10 @@ def _con() -> sqlite3.Connection:
 
 def take(kind: str, limit: int) -> None:
     """Count one `kind` for today's account; 429 once the daily limit is reached (UTC days)."""
-    ws = workspace.CURRENT.get()
+    ws, m = workspace.CURRENT.get(), orgs.MEMBER.get()
     if not ws:
         return
+    ws = f"{ws}/{m['user_id']}" if m else ws
     day = datetime.now(timezone.utc).date().isoformat()
     with _LOCK:
         c = _con()

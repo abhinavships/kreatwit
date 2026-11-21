@@ -1,7 +1,7 @@
-"""Workspaces: every signed-in account gets its own DuckDB file, so one account can never read another's data.
+"""Workspaces: every organization (kreatwit.orgs) gets its own DuckDB file, so one org can never read another's data.
 
 Isolation is physical, not a WHERE clause: the agent's SQL, the caches, chat handles and uploads all live in the
-account's file and folder. Each workspace connection is sandboxed (no file access outside its own upload folder,
+org's file and folder. Each workspace connection is sandboxed (no file access outside its own upload folder,
 no ATTACH), which also closes the escape hatches a regex SQL guard misses (read_ndjson_auto, sqlite_scan, ...).
 
 Off when no workspace is set (local dev, tests, evals): everything uses settings.db_path as before.
@@ -20,7 +20,7 @@ from pathlib import Path
 from kreatwit.settings import ROOT, settings
 
 CURRENT: ContextVar[str | None] = ContextVar("kreatwit_workspace", default=None)
-ID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")  # Supabase user ids
+ID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")  # org ids (and Supabase user ids)
 OPEN_MAX = 8  # open workspace databases kept in memory
 MEMORY_LIMIT = "200MB"  # per workspace connection; the machine has 1 GB
 

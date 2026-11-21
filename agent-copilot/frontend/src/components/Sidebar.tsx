@@ -1,10 +1,12 @@
 "use client";
 import { useState } from "react";
 import type { ChatSummary, User } from "@/contracts";
+import Link from "next/link";
+import type { Account } from "@/lib/auth";
 import { roleLabel, teamLabel } from "@/lib/format";
 
 export function Sidebar(p: {
-  users: User[]; userId: string; onUser: (id: string) => void; account?: { email: string; onSignOut: () => void };
+  users: User[]; userId: string; onUser: (id: string) => void; account?: Account;
   chats: ChatSummary[]; chatId: string; onChat: (id: string) => void; onNew: () => void;
   today: string; resetToday?: string; onToday: (d: string) => void; mock: boolean;
 }) {
@@ -17,6 +19,19 @@ export function Sidebar(p: {
         <div><div className="text-sm font-semibold leading-4">Kreatwit</div><div className="text-[11px] text-muted">Aletheia copilot{p.mock ? " · mock data" : ""}</div></div>
       </div>
 
+      {p.account ? (
+        <section aria-label="Signed in" className="rounded-lg border border-line bg-panel px-3 py-2">
+          <div className="truncate text-sm font-semibold">{p.account.member.name}</div>
+          <div className="truncate text-xs text-muted">
+            {p.account.member.title ? `${p.account.member.title} · ` : ""}{p.account.member.role} · {p.account.member.org_name}
+          </div>
+          <div className="mt-1 truncate text-[11px] text-muted">{p.account.email}</div>
+          <div className="mt-2 flex items-center justify-between gap-2 text-xs">
+            <Link href="/app/org/" className="font-medium underline hover:text-accent">Team &amp; settings</Link>
+            <button type="button" onClick={p.account.onSignOut} className="text-muted underline hover:text-fg">Sign out</button>
+          </div>
+        </section>
+      ) : (
       <section aria-label="User">
         <h2 className="mb-1 px-1 text-[11px] font-semibold uppercase tracking-wide text-muted">Acting as</h2>
         <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls="user-list"
@@ -40,13 +55,8 @@ export function Sidebar(p: {
             ))}
           </ul>
         )}
-        {p.account && (
-          <div className="mt-1 flex items-center justify-between gap-2 px-1 text-xs text-muted">
-            <span className="truncate">{p.account.email}</span>
-            <button type="button" onClick={p.account.onSignOut} className="shrink-0 underline hover:text-fg">Sign out</button>
-          </div>
-        )}
       </section>
+      )}
 
       <section aria-label="Clock">
         <label htmlFor="today" className="mb-1 block px-1 text-[11px] font-semibold uppercase tracking-wide text-muted">Today (simulated clock)</label>

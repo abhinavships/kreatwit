@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChatSummary, User } from "@/contracts";
 import { API_BASE, DEFAULT_TODAY, MOCK, fetchChats, fetchHandle, fetchUsers, ingestFile, type Ctx } from "@/lib/api";
 import { uid } from "@/lib/agui";
+import type { Account } from "@/lib/auth";
 import { useChat } from "@/lib/chat";
 import { SCENARIOS } from "@/mock/fixtures";
 import { AnswerView } from "@/components/AnswerView";
@@ -27,9 +28,9 @@ const ls = {
 };
 const newChatId = () => `chat-${uid().slice(0, 8)}`;
 
-export function Shell({ account }: { account?: { email: string; onSignOut: () => void } }) {
+export function Shell({ account }: { account?: Account }) {
   const [users, setUsers] = useState<User[]>([]);
-  const [userId, setUserId] = useState("U-201");
+  const [userId, setUserId] = useState(account?.member.user_id ?? "U-201"); // signed in: you are you, no switching
   const [today, setToday] = useState(DEFAULT_TODAY);
   const [serverToday, setServerToday] = useState(DEFAULT_TODAY);
   const [chats, setChats] = useState<ChatSummary[]>([]);
@@ -63,8 +64,8 @@ export function Shell({ account }: { account?: { email: string; onSignOut: () =>
       if (ls.get("kreatwit.dataset") !== h.dataset || !d) { setToday(h.clock_today); ls.set("kreatwit.today", h.clock_today); }
       ls.set("kreatwit.dataset", h.dataset ?? "");
     }).catch(() => { /* offline: keep the stored clock */ });
-    const u = ls.get("kreatwit.user"); if (u) setUserId(u);
-  }, []);
+    const u = ls.get("kreatwit.user"); if (u && !account) setUserId(u);
+  }, [account]);
   useEffect(() => { setBoardUser(userId); setCurrentCanvas(null); }, [userId]); // each user has their own canvas
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme === "dark" ? "dark" : "light");

@@ -2,9 +2,9 @@
 
 Supabase owns accounts: sign-up, email verification, password reset. The browser signs in with supabase-js, then
 POSTs its access token to /api/auth/session once; the server checks it with Supabase and sets its own signed,
-HttpOnly cookie. Every protected request is tied to that account's workspace (kreatwit.workspace) by the middleware,
-so no endpoint can be pointed at another account's data. Inside a workspace, the dataset persona (X-User-Id) is
-the user's own choice: it only changes whose view of their own copy they see.
+HttpOnly cookie holding only the Supabase user id. On every protected request the middleware looks the account up
+in kreatwit.orgs and binds the request to its org's workspace and to the member's own principal: the client's
+X-User-Id header and ?principal= are overwritten, so nobody can act as, or read the chats of, someone else.
 """
 
 from __future__ import annotations
@@ -19,12 +19,15 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
-from kreatwit import workspace
+from urllib.parse import parse_qsl, urlencode
+
+from kreatwit import orgs, workspace
 from kreatwit.settings import settings
 
 COOKIE = "kreatwit_session"
 TTL = 7 * 24 * 3600
-OPEN = {"/api/health", "/api/auth/session", "/api/auth/logout", "/api/auth/me", "/api/auth/config"}
+OPEN = {"/api/health", "/api/auth/session", "/api/auth/logout", "/api/auth/config"}
+NO_ORG_OK = {"/api/auth/me", "/api/org"}  # signed in but not in an org yet: may see who they are and create one
 PROTECTED = ("/api/",)  # everything else is the static site
 HIDDEN = ("/mcp", "/skills-mcp")  # MCP for local agent clients; not exposed on a public, multi-account server
 
@@ -39,8 +42,8 @@ def _mac(body: str) -> str:
     return hmac.new(settings.auth_secret.encode(), body.encode(), hashlib.sha256).hexdigest()
 
 
-def sign(ws: str, email: str, ttl: int = TTL) -> str:
-    raw = json.dumps({"w": ws, "e": email, "x": int(time.time()) + ttl}).encode()
+def sign(uid: str, email: str, ttl: int = TTL) -> str:
+    raw = json.dumps({"u": uid, "e": email, "x": int(time.time()) + ttl}).encode()
     body = base64.urlsafe_b64encode(raw).decode().rstrip("=")  # no padding: "=" would make the cookie value quoted
     return f"{body}.{_mac(body)}"
 
@@ -51,7 +54,7 @@ def verify(token: str | None) -> dict | None:
         return None
     try:
         s = json.loads(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)))
-        workspace.check(s.get("w", ""))
+        workspace.check(s.get("u", ""))
     except ValueError:
         return None
     return s if s.get("x", 0) > time.time() else None
@@ -89,11 +92,24 @@ class AuthMiddleware:
         s = verify(_cookie(scope["headers"]))
         if not s:
             return await _reply(send, 401, "sign in required")
-        token = workspace.CURRENT.set(s["w"])
+        scope = {**scope, "state": {**scope.get("state", {}), "session": s}}
+        m = orgs.member(s["u"])
+        if not m:
+            if path in NO_ORG_OK:
+                return await self.app(scope, receive, send)
+            return await _reply(send, 403, "create or join an organization first")
+        # the member is the principal: overwrite whatever persona the client sent
+        uid = m["user_id"].encode()
+        scope["headers"] = [(k, v) for k, v in scope["headers"] if k != b"x-user-id"] + [(b"x-user-id", uid)]
+        q = parse_qsl(scope.get("query_string", b"").decode("latin-1"), keep_blank_values=True)
+        if any(k == "principal" for k, _ in q):
+            scope["query_string"] = urlencode([(k, m["user_id"] if k == "principal" else v) for k, v in q]).encode()
+        t1, t2 = workspace.CURRENT.set(m["org_id"]), orgs.MEMBER.set(m)
         try:
             await self.app(scope, receive, send)
         finally:
-            workspace.CURRENT.reset(token)
+            workspace.CURRENT.reset(t1)
+            orgs.MEMBER.reset(t2)
 
 
 def supabase_user(access_token: str) -> dict | None:
@@ -123,12 +139,14 @@ def session(body: SessionIn, request: Request, response: Response) -> dict:
     if not (u.get("email_confirmed_at") or u.get("confirmed_at")):
         raise HTTPException(403, "confirm your email first")
     try:
-        ws = workspace.check(u["id"])
+        uid = workspace.check(u["id"])
     except ValueError as e:
         raise HTTPException(401, "unexpected account id") from e
-    response.set_cookie(COOKIE, sign(ws, u.get("email", "")), max_age=TTL, httponly=True, samesite="lax",
+    email = u.get("email", "")
+    orgs.accept_invite(uid, email)
+    response.set_cookie(COOKIE, sign(uid, email), max_age=TTL, httponly=True, samesite="lax",
                         secure=request.url.scheme == "https")
-    return {"auth": True, "email": u.get("email", "")}
+    return _me(uid, email)
 
 
 @router.post("/logout")
@@ -141,7 +159,12 @@ def logout(response: Response) -> dict:
 def me(request: Request) -> dict:
     if not enabled():
         return {"auth": False}
-    s = verify(request.cookies.get(COOKIE))
-    if not s:
-        raise HTTPException(401, "sign in required")
-    return {"auth": True, "email": s["e"]}
+    s = request.state.session  # the middleware already checked the cookie
+    return _me(s["u"], s["e"])
+
+
+def _me(uid: str, email: str) -> dict:
+    m = orgs.member(uid)
+    if m:
+        m = {k: m[k] for k in ("user_id", "name", "title", "role", "org_id", "org_name", "email")}
+    return {"auth": True, "email": email, "member": m, "invite": None if m else orgs.pending_invite(email)}

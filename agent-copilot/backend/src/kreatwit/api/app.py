@@ -28,6 +28,7 @@ from kreatwit.verify import VERIFICATIONS
 
 app = FastAPI(title="kreatwit")
 from .auth import AuthMiddleware, router as auth_router; app.include_router(auth_router)  # noqa: E402, E702
+from .org_api import router as org_router; app.include_router(org_router)  # noqa: E402, E702
 app.add_middleware(AuthMiddleware)  # added before CORS so CORS stays outermost (401s keep their CORS headers)
 app.add_middleware(CORSMiddleware, allow_origins=[o.strip() for o in settings.cors_origins.split(",")],
                    allow_methods=["*"], allow_headers=["*"])
@@ -48,15 +49,17 @@ RECORDS = {  # citation kind -> (table, id column)
 }
 
 
-_CHAT_OWNER: dict[str, str] = {}  # chat id -> workspace; in-memory chat state is keyed by chat id alone
+_CHAT_OWNER: dict[str, str] = {}  # chat id -> "workspace/principal"; in-memory chat state is keyed by chat id alone
 # ponytail: grows with chats since boot; fine for one machine, prune if memory shows it
 
 
 def deps_from(request: Request, chat_id: str | None = None) -> RunDeps:
     h = request.headers
     from kreatwit import workspace
-    if (ws := workspace.CURRENT.get()) and _CHAT_OWNER.setdefault(chat_id or h.get("x-chat-id") or "default", ws) != ws:
-        raise HTTPException(403, "this chat belongs to another account")
+    if (ws := workspace.CURRENT.get()):  # principal below is the member's own (the auth middleware set the header)
+        owner = f"{ws}/{h.get('x-user-id')}"
+        if _CHAT_OWNER.setdefault(chat_id or h.get("x-chat-id") or "default", owner) != owner:
+            raise HTTPException(403, "this chat belongs to someone else")
     try:
         today = date.fromisoformat(h.get("x-clock-today") or str(settings.clock_today))
     except ValueError as e:
@@ -189,6 +192,8 @@ def chat_turns(chat_id: str, principal: str) -> dict:
 
 @app.post("/api/assertions/{assertion_id}/undo")
 def undo(assertion_id: str, request: Request) -> dict:
+    from kreatwit import orgs
+    orgs.require("member")
     try:
         return memory.undo_assertion(deps_from(request), assertion_id).model_dump(mode="json")
     except ToolError as e:
@@ -212,7 +217,9 @@ def get_record(kind: str, rid: str) -> dict:
 @app.post("/api/disputes/{dispute_id}/resolve")
 async def resolve(dispute_id: str, request: Request) -> dict:
     """Human-in-the-loop decision on a proof card: {action: correct|keep, value?}. No model call."""
+    from kreatwit import orgs
     from kreatwit.memory.disputes import resolve_dispute
+    orgs.require("member")
     body = await request.json()
     try:
         return resolve_dispute(deps_from(request), dispute_id, body.get("action", ""), body.get("value"))
