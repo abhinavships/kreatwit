@@ -245,6 +245,7 @@ async def _live_turn(deps: RunDeps, message: str, state: dict) -> AsyncIterator[
         async for ev in run_native(deps, req):
             k = ev.get("ev")
             if k == "tool_start":
+                text = ""  # text before another tool call is a draft the model is about to revise
                 tool_args.append(ev.get("args") or {})
                 yield ({"type": "TOOL_CALL_START", "toolCallId": ev["id"], "toolCallName": ev["name"].removeprefix("mcp__kreatwit__"), "parentMessageId": mid})
                 yield ({"type": "TOOL_CALL_ARGS", "toolCallId": ev["id"], "delta": json.dumps(ev.get("args"), default=str)})

@@ -33,8 +33,8 @@ export function reduceEvent(t: Turn, ev: AguiEvent, now = Date.now()): Turn {
     case "TEXT_MESSAGE_START": return { ...t, draft: "" };
     case "TEXT_MESSAGE_CONTENT": return { ...t, draft: (t.draft ?? "") + ev.delta };
     case "TEXT_MESSAGE_CHUNK": return ev.delta ? { ...t, draft: (t.draft ?? "") + ev.delta } : t;
-    case "TOOL_CALL_START":
-      return { ...t, tools: [...t.tools, { id: ev.toolCallId, name: ev.toolCallName, argsText: "", startedAt: now, status: "running" }] };
+    case "TOOL_CALL_START": // text before another tool call is a draft the model is about to revise
+      return { ...t, draft: "", tools: [...t.tools, { id: ev.toolCallId, name: ev.toolCallName, argsText: "", startedAt: now, status: "running" }] };
     case "TOOL_CALL_ARGS":
       return { ...t, tools: t.tools.map((c) => (c.id === ev.toolCallId ? { ...c, argsText: c.argsText + ev.delta } : c)) };
     case "TOOL_CALL_RESULT": {

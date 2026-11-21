@@ -13,7 +13,7 @@ from functools import lru_cache
 from typing import Any, AsyncIterator
 
 from pydantic_ai import Agent, Tool
-from pydantic_ai.messages import FunctionToolCallEvent, FunctionToolResultEvent, PartDeltaEvent, TextPartDelta
+from pydantic_ai.messages import FunctionToolCallEvent, FunctionToolResultEvent, PartDeltaEvent, PartStartEvent, TextPart, TextPartDelta
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.settings import ModelSettings
@@ -79,12 +79,15 @@ async def run_native(deps: RunDeps, req: dict) -> AsyncIterator[dict]:
                     c = ev.part.content  # the ToolReturnPart (or a RetryPromptPart on a validation error)
                     yield {"ev": "tool_end", "id": ev.part.tool_call_id, "name": ev.part.tool_name,
                            "result": c if isinstance(c, str) else json.dumps(c, default=str)}
+                elif isinstance(ev, PartStartEvent) and isinstance(ev.part, TextPart) and ev.part.content:
+                    yield {"ev": "delta", "text": ev.part.content}  # a text part's first chunk arrives here, not as a delta
                 elif isinstance(ev, PartDeltaEvent) and isinstance(ev.delta, TextPartDelta) and ev.delta.content_delta:
                     yield {"ev": "delta", "text": ev.delta.content_delta}
                 elif type(ev).__name__ == "AgentRunResultEvent":
                     yield {"ev": "final", "text": str(ev.result.output), "messages": ev.result.all_messages()}
     except Exception as e:  # provider/tool failure: report, never hang the stream
-        if type(e).__name__ == "UsageLimitExceeded":  # looping on tools: the caller answers from what was fetched
+        if type(e).__name__ in ("UsageLimitExceeded", "UnexpectedModelBehavior"):
+            # looping on tools, or the model kept returning empty/invalid output: the caller answers from what was fetched
             yield {"ev": "budget", "message": str(e)}
         else:
             yield {"ev": "error", "message": f"{type(e).__name__}: {e}"}
