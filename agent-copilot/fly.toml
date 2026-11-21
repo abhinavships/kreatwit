@@ -18,9 +18,9 @@ primary_region = 'sin'
 [http_service]
   internal_port = 8000
   force_https = true
-  auto_stop_machines = 'off'  # live chat state is in memory; a stopped machine forgets it
+  auto_stop_machines = 'stop'  # sleeps when idle to keep the bill low; an open chat is forgotten when it sleeps
   auto_start_machines = true
-  min_machines_running = 1
+  min_machines_running = 0
 
   [[http_service.checks]]
     interval = '30s'
