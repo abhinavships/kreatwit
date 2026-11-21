@@ -3,9 +3,9 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from wellops.contracts import RunDeps
-from wellops.ingest import pipeline
-from wellops.tools import ingest_tools, sql
+from kreatwit.contracts import RunDeps
+from kreatwit.ingest import pipeline
+from kreatwit.tools import ingest_tools, sql
 
 from conftest import TODAY
 
@@ -51,7 +51,7 @@ def test_unknown_csv_becomes_queryable_user_table(tmp_path, db):
 
 
 def test_markdown_manual_rules_apply_and_doc_is_searchable(tmp_path, db):
-    from wellops.tools import read_doc, search_docs
+    from kreatwit.tools import read_doc, search_docs
     p = tmp_path / "T900 manual.md"
     p.write_text("# T900 operating manual\n\n## 1. Scope\n\nProcedures not listed here follow the T200 manual.\n\n"
                  "## 3. Production\n\nA T900 well is producing only when its wellhead is at least 30 °C above ambient air.\n")
@@ -82,7 +82,7 @@ def test_image_is_described_once_and_tools_work(tmp_path, monkeypatch, db):
 
 
 def test_api_upload_multipart_and_history(db):
-    from wellops.api import app as api
+    from kreatwit.api import app as api
     c = TestClient(api.app)
     r = c.post("/api/ingest", files={"file": ("notes.txt", b"Crew reported a loose flange at the north pad.", "text/plain")},
                headers={"X-User-Id": "U-201", "X-Chat-Id": "ing"})

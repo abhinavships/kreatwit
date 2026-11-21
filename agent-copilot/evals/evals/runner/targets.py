@@ -135,7 +135,7 @@ class ApiTarget:
     name = "api"
 
     def __init__(self, base_url: str | None = None, timeout: float = 300.0):
-        self.base_url = (base_url or os.environ.get("WELLOPS_API_URL", "http://localhost:8000")).rstrip("/")
+        self.base_url = (base_url or os.environ.get("KREATWIT_API_URL", "http://localhost:8000")).rstrip("/")
         self.timeout = timeout
 
     def respond(self, case: dict, turn: Turn) -> tuple[dict, list[dict]]:
@@ -167,14 +167,14 @@ OUTPUT_TOOLS = {"final_result"}  # pydantic-ai output tool: the answer itself, c
 
 
 def parse_agui(events: list[dict]) -> tuple[dict, list[dict]]:
-    """CUSTOM 'wellops.answer' -> AnswerSpec; TOOL_CALL_* -> trace. Falls back to streamed text if no answer event."""
+    """CUSTOM 'kreatwit.answer' -> AnswerSpec; TOOL_CALL_* -> trace. Falls back to streamed text if no answer event."""
     answer, text, calls, order, extras, run_error = None, [], {}, [], {}, None
     for e in events:
         t = e.get("type")
         if t == "RUN_ERROR":
             run_error = f"{e.get('code') or ''} {e.get('message') or ''}".strip()
         elif t == "CUSTOM":
-            if e.get("name") == "wellops.answer":
+            if e.get("name") == "kreatwit.answer":
                 v = e.get("value")
                 answer = json.loads(v) if isinstance(v, str) else v
             else:

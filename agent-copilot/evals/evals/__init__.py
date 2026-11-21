@@ -1,4 +1,4 @@
-"""WellOps evaluation system (stream D). Offline-first; Opik logging is opt-in."""
+"""Kreatwit evaluation system (stream D). Offline-first; Opik logging is opt-in."""
 from pathlib import Path
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]          # agent-copilot/evals

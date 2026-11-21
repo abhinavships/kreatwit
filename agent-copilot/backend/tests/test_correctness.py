@@ -1,5 +1,5 @@
-from wellops import tools as T
-from wellops.qa.correctness import check
+from kreatwit import tools as T
+from kreatwit.qa.correctness import check
 
 Q6 = "Which 3 wells in Northeast Block 7 had the most downtime in the last 4 months? Show a bar chart."
 

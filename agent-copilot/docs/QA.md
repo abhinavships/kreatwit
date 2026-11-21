@@ -44,7 +44,7 @@ case: the API rescans every 5 s, the explorer polls every 15 s.
 | `turns` | turn | user, chat, clock, question, setup flag, score, latency, tokens, retries, model, error, taxonomy (with evidence), expectation, answer JSON, tool trace JSON |
 | `scores` | turn × scorer | value (NULL = not applicable), reason, details JSON |
 
-Model and harness come from the API's `wellops.usage` / `wellops.verification` events (`hermes-agent → gemini-3.8-flash`).
+Model and harness come from the API's `kreatwit.usage` / `kreatwit.verification` events (`hermes-agent → gemini-3.8-flash`).
 New runs record `git_sha` and the target model in `results.json → meta`. For older runs the sha is inferred from the last
 commit before the run started (flagged with `*` in the UI), and an optional `results/<run>/meta.json` can annotate the model.
 `data_version` is read from the answer's `dataset=` assumption.
@@ -58,7 +58,7 @@ shows. Categories are listed in priority order; the first one that hits is the *
 |---|---|---|
 | 1 | run error / timeout | turn `error`, `run_error` without an answer event; `timeout` flag from the message |
 | 2 | memory leak across users | `leak` scorer = 0 (strings of another principal in the answer) |
-| 3 | ungrounded claim | a failing verifier gate in `wellops.verification`, "maximum output retries" (verifier rejected every attempt), or numbers in the markdown that appear in no tool result, the question or the key (skipped when the bridge truncated a result at 2000 chars, and for small integers) |
+| 3 | ungrounded claim | a failing verifier gate in `kreatwit.verification`, "maximum output retries" (verifier rejected every attempt), or numbers in the markdown that appear in no tool result, the question or the key (skipped when the bridge truncated a result at 2000 chars, and for small integers) |
 | 4 | wrong window | the start/end args of windowed tool calls vs the window implied by the case's `truth` args (`since/until`, `days`, `weeks`, `months`, `years`, `year`), tolerance max(3 d, 5 %) |
 | 5 | wrong number | `facts.numbers_missing` |
 | 6 | correction not applied | `memory` scorer = 0, or an overlay was expected but `applied_overlays` is empty |

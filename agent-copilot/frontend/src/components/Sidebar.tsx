@@ -13,8 +13,8 @@ export function Sidebar(p: {
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto p-3">
       <div className="flex items-center gap-2 px-1">
-        <span aria-hidden className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-sm font-bold text-accent-fg">W</span>
-        <div><div className="text-sm font-semibold leading-4">WellOps Copilot</div><div className="text-[11px] text-muted">Asset Intelligence{p.mock ? " · mock data" : ""}</div></div>
+        <span aria-hidden className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-sm font-bold text-accent-fg">K</span>
+        <div><div className="text-sm font-semibold leading-4">Kreatwit</div><div className="text-[11px] text-muted">Aletheia copilot{p.mock ? " · mock data" : ""}</div></div>
       </div>
 
       <section aria-label="User">

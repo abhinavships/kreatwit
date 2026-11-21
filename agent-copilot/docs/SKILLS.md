@@ -1,6 +1,6 @@
 # Self-improving skills
 
-WellOps keeps a library of **skills**: playbooks that say which tools to call, in what order, with which arguments,
+Kreatwit keeps a library of **skills**: playbooks that say which tools to call, in what order, with which arguments,
 which visual to show, and what has gone wrong before. Some are written by people (`skills/*/SKILL.md`). The rest are
 **distilled automatically from turns the verifier passed**. The agent looks them up before acting, and each outcome
 feeds back into the library.
@@ -10,7 +10,7 @@ feeds back into the library.
                                                                                       │
              ┌──────────────── observe ─────────────── distill ─────────────── reinforce / decay ──┐
              │  CALL_LOG (native agent)   literals -> {slots}, signature     uses / successes / failures,
-             │  + wellops.trace steps     name from intent, description      triggers, pitfalls, deprecate
+             │  + kreatwit.trace steps     name from intent, description      triggers, pitfalls, deprecate
              └──────────────────────────────────────────┬────────────────────────────────────────────┘
                                                         ▼
                                    DuckDB: skills, skill_runs  (same file as the substrate)
@@ -27,14 +27,14 @@ feeds back into the library.
 
 | Path | Role |
 |---|---|
-| `backend/src/wellops/skills/__init__.py` | Public API: `find_skills`, `get_skill`, `list_skills`, `create_skill`, `record_outcome`, `export_skill_md`, `learn_from_turn`, `on_turn_complete` |
-| `backend/src/wellops/skills/store.py` | DuckDB tables, CRUD, seeding from `skills/*/SKILL.md` |
-| `backend/src/wellops/skills/distill.py` | Generalizing literals into slots, signatures, similarity, deterministic naming |
-| `backend/src/wellops/skills/retrieve.py` | Tokenizer (entity mentions normalized to slots) and BM25 ranking weighted by success rate |
-| `backend/src/wellops/skills/server.py` | `skills_mcp` FastMCP server, `install()` mounts it at `/skills-mcp` |
-| `backend/src/wellops/api/skills_api.py` | REST router; its `install(app)` adds the router and the MCP mount (one line in `app.py`) |
-| `backend/src/wellops/mcp_server.py` | `find_skills` / `get_skill` in the main tool registry; `CALL_LOG` (tool path per chat) |
-| `backend/src/wellops/api/native_agent.py` | Appends every in-process tool call `{name, args}` to `CALL_LOG` |
+| `backend/src/kreatwit/skills/__init__.py` | Public API: `find_skills`, `get_skill`, `list_skills`, `create_skill`, `record_outcome`, `export_skill_md`, `learn_from_turn`, `on_turn_complete` |
+| `backend/src/kreatwit/skills/store.py` | DuckDB tables, CRUD, seeding from `skills/*/SKILL.md` |
+| `backend/src/kreatwit/skills/distill.py` | Generalizing literals into slots, signatures, similarity, deterministic naming |
+| `backend/src/kreatwit/skills/retrieve.py` | Tokenizer (entity mentions normalized to slots) and BM25 ranking weighted by success rate |
+| `backend/src/kreatwit/skills/server.py` | `skills_mcp` FastMCP server, `install()` mounts it at `/skills-mcp` |
+| `backend/src/kreatwit/api/skills_api.py` | REST router; its `install(app)` adds the router and the MCP mount (one line in `app.py`) |
+| `backend/src/kreatwit/mcp_server.py` | `find_skills` / `get_skill` in the main tool registry; `CALL_LOG` (tool path per chat) |
+| `backend/src/kreatwit/api/native_agent.py` | Appends every in-process tool call `{name, args}` to `CALL_LOG` |
 | `backend/tests/test_skills.py` | Seeding, Q6 distillation, dedupe, failure -> pitfall, decay, retrieval, MCP/REST |
 
 ## Store
@@ -148,7 +148,7 @@ REST: `GET /api/skills` (`?q=` to search, `?source=auto`), `GET /api/skills/{id}
 `turn_stream.stream_turn` needs one line, right after `yield _sse(trace)` on the live path:
 
 ```python
-    __import__("wellops.skills", fromlist=["on_turn_complete"]).on_turn_complete(deps, message, steps, state.get("ok", False), state["spec"].visuals if state.get("spec") else [])
+    __import__("kreatwit.skills", fromlist=["on_turn_complete"]).on_turn_complete(deps, message, steps, state.get("ok", False), state["spec"].visuals if state.get("spec") else [])
 ```
 
 Cache hits return earlier and are never counted. `SKILLS_LEARN=false` turns learning off. Evals can leave it on: a

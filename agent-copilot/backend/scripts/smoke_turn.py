@@ -13,10 +13,10 @@ from datetime import date
 
 from pydantic_ai.messages import RetryPromptPart, ToolCallPart
 
-from wellops.agent import build_agent, run_turn
-from wellops.agent.agent import build_model
-from wellops.contracts import RunDeps
-from wellops.verify import VERIFICATIONS
+from kreatwit.agent import build_agent, run_turn
+from kreatwit.agent.agent import build_model
+from kreatwit.contracts import RunDeps
+from kreatwit.verify import VERIFICATIONS
 
 QUESTIONS = {
     "Q1": "Is WELL-0001 producing oil right now? When was it last inspected, and by whom? Show me its status card.",

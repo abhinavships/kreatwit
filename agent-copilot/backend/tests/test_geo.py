@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from wellops.api import app as api
+from kreatwit.api import app as api
 
 
 def test_locations_by_ids_and_area(db):

@@ -9,7 +9,7 @@ from typing import Any, Callable
 
 from evals import REPO_ROOT
 
-PROJECT = os.environ.get("OPIK_PROJECT_NAME", "wellops-copilot")
+PROJECT = os.environ.get("OPIK_PROJECT_NAME", "kreatwit-copilot")
 
 
 def load_env() -> None:
@@ -41,7 +41,7 @@ def case_to_item(case: dict) -> dict:
 
 
 def push_dataset(client, name: str, cases: list[dict]):
-    ds = client.get_or_create_dataset(name=name, description="WellOps copilot eval episodes (multi-turn, multi-principal)")
+    ds = client.get_or_create_dataset(name=name, description="Kreatwit copilot eval episodes (multi-turn, multi-principal)")
     ds.insert([case_to_item(c) for c in cases])
     return ds
 
@@ -51,9 +51,9 @@ def log_turn_traces(client, case_result: dict, project: str, experiment: str) ->
     for t in case_result["turns"]:
         fb = []
         if not t["setup"]:
-            fb = [dict(name=f"wellops_{k}", value=float(v["value"]), reason=(v["reason"] or "")[:500])
+            fb = [dict(name=f"kreatwit_{k}", value=float(v["value"]), reason=(v["reason"] or "")[:500])
                   for k, v in t["scores"].items() if v["value"] is not None]
-            fb.append(dict(name="wellops_aggregate", value=float(t["agg"]["score"])))
+            fb.append(dict(name="kreatwit_aggregate", value=float(t["agg"]["score"])))
         tr = client.trace(
             name=f"{case_result['case_id']}:{t['turn_id']}", project_name=project, thread_id=t["chat"],
             input=dict(user_id=t["user"], clock=t["clock"], say=t["say"]),
@@ -61,7 +61,7 @@ def log_turn_traces(client, case_result: dict, project: str, experiment: str) ->
                         conflicts=t["answer"].get("conflicts", [])),
             metadata=dict(case_id=case_result["case_id"], setup=t["setup"], experiment=experiment, run=case_result["run"],
                           latency_s=t["latency_s"]),
-            tags=["wellops-eval", case_result["suite"]], feedback_scores=fb or None)
+            tags=["kreatwit-eval", case_result["suite"]], feedback_scores=fb or None)
         for c in t["trace"]:
             tr.span(name=str(c.get("name")), type="tool", input={"args": c.get("args")}, output={"result": c.get("result")})
         tr.end()
@@ -85,7 +85,7 @@ def run_experiment(client, *, dataset_name: str, cases: list[dict], runner: Call
         res = runner(by_id[cid], run_idx)
         results.append(res)
         try:
-            opik.opik_context.update_current_trace(thread_id=res["turns"][0]["chat"], tags=["wellops-eval", res["suite"]],
+            opik.opik_context.update_current_trace(thread_id=res["turns"][0]["chat"], tags=["kreatwit-eval", res["suite"]],
                                                   metadata=dict(case_id=cid, run=run_idx))
         except Exception:
             pass

@@ -63,7 +63,7 @@ def test_parse_agui_events():
     ev = [dict(type="TOOL_CALL_START", toolCallId="1", toolCallName="downtime"),
           dict(type="TOOL_CALL_ARGS", toolCallId="1", delta='{"area":'), dict(type="TOOL_CALL_ARGS", toolCallId="1", delta='"x"}'),
           dict(type="TOOL_CALL_RESULT", toolCallId="1", content='{"row_count":3}'),
-          dict(type="CUSTOM", name="wellops.answer", value=json.dumps(ans)), dict(type="RUN_FINISHED")]
+          dict(type="CUSTOM", name="kreatwit.answer", value=json.dumps(ans)), dict(type="RUN_FINISHED")]
     a, tr = parse_agui(ev)
     assert a["markdown"] == "hi" and tr == [dict(name="downtime", args={"area": "x"}, result={"row_count": 3})]
     a2, _ = parse_agui([dict(type="TEXT_MESSAGE_CONTENT", delta="plain")])
@@ -80,7 +80,7 @@ def test_api_target_against_mock_agui_server():
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.end_headers()
-            for e in [dict(type="CUSTOM", name="wellops.answer", value=dict(markdown="ok", visuals=[]))]:
+            for e in [dict(type="CUSTOM", name="kreatwit.answer", value=dict(markdown="ok", visuals=[]))]:
                 self.wfile.write(f"data: {json.dumps(e)}\n\n".encode())
 
         def log_message(self, *a):
@@ -97,7 +97,7 @@ def test_api_target_against_mock_agui_server():
 def test_cli_offline_writes_results(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr("evals.run.RESULTS_DIR", tmp_path)
     assert main(["--target", "fake", "--suite", "golden", "--k", "2", "--cases", "Q06,Q16", "--no-meta"]) == 0
-    run = next(tmp_path.iterdir())
+    run = next(p for p in tmp_path.iterdir() if p.is_dir())  # the QA store also writes qa.sqlite here
     assert (run / "results.json").exists() and (run / "report.md").exists()
     assert json.loads((run / "results.json").read_text())["summary"]["pass_hat_k"] == 1.0
 
@@ -114,7 +114,7 @@ def test_cli_interrupted_run_keeps_finished_cases(tmp_path, monkeypatch):
     monkeypatch.setattr(R, "RESULTS_DIR", tmp_path)
     monkeypatch.setattr(R, "run_case", flaky)
     assert main(["--target", "fake", "--suite", "golden", "--cases", "Q01,Q06,Q13", "--no-meta"]) == 130
-    run = next(tmp_path.iterdir())
+    run = next(p for p in tmp_path.iterdir() if p.is_dir())  # the QA store also writes qa.sqlite here
     assert len((run / "partial.jsonl").read_text().splitlines()) == 1
     assert json.loads((run / "results.json").read_text())["summary"]["interrupted"] == "signal 15"
     assert "PARTIAL RUN" in (run / "report.md").read_text()

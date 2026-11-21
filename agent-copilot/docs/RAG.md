@@ -1,4 +1,4 @@
-# RAG layer (`wellops.rag`)
+# RAG layer (`kreatwit.rag`)
 
 `search_knowledge` answers "why / what does the manual say / what did the report or note say" questions with
 verbatim passages and citations. Numbers, counts and statuses stay with the typed tools; this layer only finds text.
@@ -53,7 +53,7 @@ the passage verbatim.
 - Called at the end of `substrate.ingest.ingest()` (BM25 only) and from `ingest/pipeline.py` after a document, image or
   known-table upload (embeds only the chunks that upload added).
 - First `search_knowledge` call on a DB without an index builds the BM25 index (no embeddings on the question path).
-- Backfill vectors: `uv run python -m wellops.rag.index [dataset]`, or `python -m wellops.substrate.ingest` (its
+- Backfill vectors: `uv run python -m kreatwit.rag.index [dataset]`, or `python -m kreatwit.substrate.ingest` (its
   `main()` fills vectors after ingest).
 
 ## Cost guards

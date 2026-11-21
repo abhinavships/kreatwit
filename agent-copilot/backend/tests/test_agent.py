@@ -4,12 +4,12 @@ import pytest
 from pydantic_ai.messages import ModelResponse, ToolCallPart
 from pydantic_ai.models.function import DeltaToolCall, FunctionModel
 
-from wellops import tools as T
-from wellops.agent import build_agent, run_turn
-from wellops.agent import skills as sk
-from wellops.contracts import AnswerSpec, AssertionIn
-from wellops.memory import assert_fact
-from wellops.verify import VERIFICATIONS
+from kreatwit import tools as T
+from kreatwit.agent import build_agent, run_turn
+from kreatwit.agent import skills as sk
+from kreatwit.contracts import AnswerSpec, AssertionIn
+from kreatwit.memory import assert_fact
+from kreatwit.verify import VERIFICATIONS
 
 
 def scripted(*steps):

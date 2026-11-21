@@ -54,25 +54,25 @@ export function Shell({ account }: { account?: { email: string; onSignOut: () =>
 
   // restore preferences
   useEffect(() => {
-    const t = ls.get("wellops.theme") as "light" | "dark" | null; if (t) setTheme(t);
-    const d = ls.get("wellops.today"); if (d) setToday(d);
+    const t = ls.get("kreatwit.theme") as "light" | "dark" | null; if (t) setTheme(t);
+    const d = ls.get("kreatwit.today"); if (d) setToday(d);
     // the backend's dataset decides "today": a new dataset (e.g. test data, today = 2027-01-15) resets the clock
     fetch(`${API_BASE}/api/health`).then((r) => r.json()).then((h: { dataset?: string; clock_today?: string }) => {
       if (!h.clock_today) return;
       setServerToday(h.clock_today);
-      if (ls.get("wellops.dataset") !== h.dataset || !d) { setToday(h.clock_today); ls.set("wellops.today", h.clock_today); }
-      ls.set("wellops.dataset", h.dataset ?? "");
+      if (ls.get("kreatwit.dataset") !== h.dataset || !d) { setToday(h.clock_today); ls.set("kreatwit.today", h.clock_today); }
+      ls.set("kreatwit.dataset", h.dataset ?? "");
     }).catch(() => { /* offline: keep the stored clock */ });
-    const u = ls.get("wellops.user"); if (u) setUserId(u);
+    const u = ls.get("kreatwit.user"); if (u) setUserId(u);
   }, []);
   useEffect(() => { setBoardUser(userId); setCurrentCanvas(null); }, [userId]); // each user has their own canvas
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme === "dark" ? "dark" : "light");
-    ls.set("wellops.theme", theme);
+    ls.set("kreatwit.theme", theme);
   }, [theme]);
   useEffect(() => { fetchUsers().then(setUsers).catch((e: Error) => setLoadErr(`Could not load users: ${e.message}`)); }, []);
 
-  const registryKey = `wellops.chats.${userId}`;
+  const registryKey = `kreatwit.chats.${userId}`;
   const loadChats = useCallback(async () => {
     let local: ChatSummary[] = [];
     try { local = JSON.parse(ls.get(registryKey) ?? "[]") as ChatSummary[]; } catch { /* ignore */ }
@@ -93,12 +93,12 @@ export function Shell({ account }: { account?: { email: string; onSignOut: () =>
     const seq = ++loadSeq.current;
     loadChats().then((all) => {
       if (seq !== loadSeq.current) return; // a newer user switch is in flight
-      const last = ls.get(`wellops.chat.${userId}`);
+      const last = ls.get(`kreatwit.chat.${userId}`);
       const id = last ?? all[0]?.chat_id ?? newChatId();
-      setChatId(id); ls.set(`wellops.chat.${userId}`, id);
+      setChatId(id); ls.set(`kreatwit.chat.${userId}`, id);
     });
   }, [loadChats, userId]);
-  const openChat = (id: string) => { setChatId(id); ls.set(`wellops.chat.${userId}`, id); setLeftOpen(false); };
+  const openChat = (id: string) => { setChatId(id); ls.set(`kreatwit.chat.${userId}`, id); setLeftOpen(false); };
 
   // register chat in the local list once it has a first turn
   const firstText = turnsChat === chatId ? turns[0]?.userText : undefined; // never the previous chat's question
@@ -169,10 +169,10 @@ export function Shell({ account }: { account?: { email: string; onSignOut: () =>
     if (v) speak("Voice mode on.").catch(() => {}); else stopSpeaking(); // the click unlocks audio playback in the browser
   };
 
-  const switchUser = (id: string) => { setUserId(id); ls.set("wellops.user", id); setLeftOpen(false); };
+  const switchUser = (id: string) => { setUserId(id); ls.set("kreatwit.user", id); setLeftOpen(false); };
   const sidebar = (
     <Sidebar users={account ? users.filter((u) => u.user_id === userId) : users} account={account} userId={userId} onUser={switchUser} chats={chats} chatId={chatId} onChat={openChat}
-      onNew={() => openChat(newChatId())} today={today} resetToday={serverToday} onToday={(d) => { setToday(d); ls.set("wellops.today", d); }} mock={MOCK} />
+      onNew={() => openChat(newChatId())} today={today} resetToday={serverToday} onToday={(d) => { setToday(d); ls.set("kreatwit.today", d); }} mock={MOCK} />
   );
   const xray = <XrayPanel turns={turns} selected={selTurn} onSelect={setSelTurn} />;
 
@@ -220,7 +220,7 @@ export function Shell({ account }: { account?: { email: string; onSignOut: () =>
         <main className="flex min-w-0 flex-1 flex-col">
           <header className="flex items-center gap-3 border-b border-line/70 bg-bg/60 px-5 py-3 backdrop-blur">
             <button type="button" className={`${iconBtn} md:hidden`} onClick={() => setLeftOpen(true)} aria-label="Open menu">☰</button>
-            <h1 className="label min-w-0 flex-1 truncate"><span className="text-fg">WellOps</span> · case file <span suppressHydrationWarning>{chatId.replace(/^chat-/, "").slice(0, 6).toUpperCase()}</span><span className="hidden sm:inline"> · {chats.find((c) => c.chat_id === chatId)?.title || "new inquiry"}</span></h1>
+            <h1 className="label min-w-0 flex-1 truncate"><span className="text-fg">Aletheia</span> · case file <span suppressHydrationWarning>{chatId.replace(/^chat-/, "").slice(0, 6).toUpperCase()}</span><span className="hidden sm:inline"> · {chats.find((c) => c.chat_id === chatId)?.title || "new inquiry"}</span></h1>
             <span className="label hidden md:inline">as of {today}</span>
             <button type="button" onClick={() => setCompareOpen((v) => !v)} aria-pressed={compareOpen} data-testid="toggle-compare"
               className={`hidden rounded-full px-3 py-1.5 text-xs transition lg:inline-flex ${compareOpen ? "bg-fg text-bg" : "border border-line text-muted hover:border-fg hover:text-fg"}`}>
@@ -248,7 +248,7 @@ export function Shell({ account }: { account?: { email: string; onSignOut: () =>
               {loadErr && <p role="alert" className="rounded-2xl border border-bad/30 bg-bad/10 p-3 text-sm text-bad">{loadErr}. Is the backend running at the configured API base?</p>}
               {turns.length === 0 && (
                 <div className="flex min-h-[68vh] flex-col justify-center">
-                  <div className="label flex items-center justify-between border-b border-line pb-2"><span><span className="text-warn">Wellops</span> · asset intelligence</span><span>Fig. 0 — every figure traces to a record</span></div>
+                  <div className="label flex items-center justify-between border-b border-line pb-2"><span><span className="text-warn">Aletheia</span> · by Kreatwit</span><span>Fig. 0 — every figure traces to a record</span></div>
                   <div className="mx-auto mt-10 inline-flex items-center gap-2 rounded-full border border-line bg-panel px-1.5 py-1 text-[13px]">
                     <span className="rounded-full bg-fg px-2 py-0.5 font-mono text-[10px] tracking-widest text-bg">NEW</span>
                     <span>Proof before any correction · drag figures to compare</span>

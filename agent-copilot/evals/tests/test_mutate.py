@@ -44,7 +44,7 @@ def test_collision_scenario_is_detected(tmp_path):
 
 def test_type_without_manual_falls_back_and_is_flagged(tmp_path):
     """A new type with no manual must not vanish from the views: T200 thresholds plus a dq flag that says so."""
-    from wellops.substrate import ingest
+    from kreatwit.substrate import ingest
     m = make_mutated(tmp_path / "n", seed=3, n_new=2, n_t500=2, n_rename=1)
     (tmp_path / "n/fleet/well-types/T500.md").unlink()
     con = ingest.connect(tmp_path / "n.duckdb")

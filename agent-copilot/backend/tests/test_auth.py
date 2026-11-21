@@ -3,9 +3,9 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from wellops.api import auth
-from wellops.api.app import app
-from wellops.settings import settings
+from kreatwit.api import auth
+from kreatwit.api.app import app
+from kreatwit.settings import settings
 
 
 @pytest.fixture

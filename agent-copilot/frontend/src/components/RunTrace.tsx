@@ -4,9 +4,9 @@ import type { Turn } from "@/lib/chat";
 
 type Node = { name: string; ms?: number; ok?: boolean; live?: boolean; detail?: string };
 
-const pretty = (n: string) => n.replace(/^mcp__wellops__/, "");
+const pretty = (n: string) => n.replace(/^mcp__kreatwit__/, "");
 
-/** The agent run as a pipeline, built from AG-UI tool-call events (live) or the measured wellops.trace (final). */
+/** The agent run as a pipeline, built from AG-UI tool-call events (live) or the measured kreatwit.trace (final). */
 function nodesOf(t: Turn): Node[] {
   if (t.trace?.steps?.length) {
     return [...t.trace.steps.map((s) => ({ name: pretty(s.name), ms: s.ms, ok: s.ok, detail: s.detail })),

@@ -7,7 +7,7 @@ import type { BoardCard } from "@/lib/board";
 export interface CanvasSummary { canvas_id: string; name: string; card_count: number; updated_at: string }
 export interface SavedCanvas { canvas_id: string; name: string; cards: BoardCard[]; created_at: string; updated_at: string }
 
-const MOCK_KEY = "wellops.canvases.mock"; // NEXT_PUBLIC_MOCK=1 has no backend: keep canvases in localStorage
+const MOCK_KEY = "kreatwit.canvases.mock"; // NEXT_PUBLIC_MOCK=1 has no backend: keep canvases in localStorage
 function mockAll(): SavedCanvas[] {
   try { return JSON.parse(localStorage.getItem(MOCK_KEY) ?? "[]") as SavedCanvas[]; } catch { return []; }
 }

@@ -13,7 +13,7 @@ export function AuthGate() {
 
   const accept = (m: Me) => {
     // Shell and the board read the acting user from here on mount; the server ignores it and uses the session anyway
-    if (m.auth && m.user_id) { try { localStorage.setItem("wellops.user", m.user_id); } catch { /* ignore */ } }
+    if (m.auth && m.user_id) { try { localStorage.setItem("kreatwit.user", m.user_id); } catch { /* ignore */ } }
     setMe(m);
   };
   useEffect(() => {
@@ -46,7 +46,7 @@ export function AuthGate() {
   return (
     <main className="grid min-h-screen place-items-center p-4">
       <form onSubmit={signIn} className="w-full max-w-sm space-y-3 rounded-xl border border-line bg-panel p-6">
-        <h1 className="text-lg font-semibold">Sign in to WellOps Copilot</h1>
+        <h1 className="text-lg font-semibold">Sign in to Kreatwit</h1>
         <label className="block text-sm">Email
           <input name="email" type="email" required autoComplete="username" autoFocus className={`mt-1 ${field}`} />
         </label>

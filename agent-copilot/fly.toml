@@ -1,14 +1,14 @@
-# fly.toml app configuration file generated for wellops-copilot on 2026-11-16T19:52:27+05:30
+# fly.toml app configuration file generated for kreatwit-copilot on 2026-11-16T19:52:27+05:30
 #
 # See https://docs.fly.io/reference/configuration for information about how to use this file.
 #
 
-app = 'wellops-copilot'
+app = 'kreatwit-copilot'
 primary_region = 'sin'
 
 [build]
 [env]
-  CORS_ORIGINS = 'https://wellops-copilot.fly.dev'
+  CORS_ORIGINS = 'https://kreatwit-copilot.fly.dev'
 
 [[mounts]]
   source = 'data'

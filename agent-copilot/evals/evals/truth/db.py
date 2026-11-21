@@ -1,11 +1,11 @@
-"""Scratch DuckDB with the substrate ingested (never touches backend/wellops.duckdb)."""
+"""Scratch DuckDB with the substrate ingested (never touches backend/kreatwit.duckdb)."""
 from __future__ import annotations
 
 from contextlib import contextmanager
 from datetime import date, datetime
 from pathlib import Path
 
-from wellops.substrate import ingest
+from kreatwit.substrate import ingest
 
 from evals import CACHE_DIR, SAMPLE_DATA
 
@@ -31,7 +31,7 @@ def get_con(data_dir: Path = SAMPLE_DATA, ds: str = DS, fresh: bool = False):
     if not have:
         ingest.ingest(data_dir, ds, con)
     else:
-        from wellops.substrate import views
+        from kreatwit.substrate import views
         views.install(con)
     con.execute("SET TimeZone='UTC'")
     _CON[key] = con

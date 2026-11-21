@@ -85,15 +85,15 @@ def _meta(turn: dict) -> dict:
 
 
 def turn_model(turn: dict) -> tuple[str | None, str | None]:
-    """(harness, model) from the wellops.usage / wellops.verification events the API streams."""
+    """(harness, model) from the kreatwit.usage / kreatwit.verification events the API streams."""
     ev = _meta(turn).get("events") or {}
     harness = model = None
-    for u in ev.get("wellops.usage") or []:
+    for u in ev.get("kreatwit.usage") or []:
         m = (u or {}).get("model")
         if m:
             mm = MODEL_RE.match(m)
             harness, model = (mm.group(1), mm.group(2)) if mm else (None, m)
-    for v in ev.get("wellops.verification") or []:
+    for v in ev.get("kreatwit.verification") or []:
         harness = harness or (v or {}).get("harness")
     return harness, model
 
@@ -115,13 +115,13 @@ def _tok(v) -> int | None:
 def turn_tokens(turn: dict) -> int | None:
     m = _meta(turn)
     t = _tok(m.get("tokens"))
-    for u in (m.get("events") or {}).get("wellops.usage") or []:
+    for u in (m.get("events") or {}).get("kreatwit.usage") or []:
         t = t if t is not None else _tok((u or {}).get("tokens") or u)
     return t
 
 
 def turn_retries(turn: dict) -> int | None:
-    vs = (_meta(turn).get("events") or {}).get("wellops.verification") or []
+    vs = (_meta(turn).get("events") or {}).get("kreatwit.verification") or []
     r = [v.get("retries") for v in vs if isinstance(v, dict) and isinstance(v.get("retries"), int)]
     return max(r) if r else None
 

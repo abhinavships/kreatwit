@@ -40,14 +40,14 @@ github.com/FlytBaseAILabs/flytbase-ahc-swe-asset-intelligence-dataset). Re-clone
 | Area | State | Where | Verify |
 |---|---|---|---|
 | Plan/docs | ✅ v4 final | `*.md` | — |
-| L0 substrate | ✅ done | `backend/src/wellops/substrate/` (ingest, views macros, report_facts, rules.yaml, schema.sql) | `cd backend && uv run python -m wellops.substrate.ingest && uv run pytest -q tests/test_substrate.py` (10 pass) |
-| L1 dq flags | ✅ done | `backend/src/wellops/trust/dq.py` | flags: hot_idle 36, recorded_status_stale 21, inspection_gap 14, repair_in_progress 8, nonstandard filename 2, ref-only-in-text 2 |
-| Contracts | ✅ done | `backend/src/wellops/contracts/__init__.py` (TS mirror at `frontend/src/contracts.ts`) | — |
-| L2 tools | ✅ done | `backend/src/wellops/tools/` (core, data, docs, entity, obligations) | `uv run pytest -q tests/test_tools.py` |
-| Memory | ✅ done | `backend/src/wellops/memory/` (assertions, conflicts, episodes) | — |
-| L3 agent + skills | ✅ built (tested with TestModel, not yet run on a real model) | `backend/src/wellops/agent/` (agent, prompt, skills, turn), `skills/*/SKILL.md` (9) | `uv run pytest -q tests/test_agent.py` |
-| L4 verifier | ✅ gates + output_validator | `backend/src/wellops/verify/gates.py` | backend `uv run pytest -q` (33 pass) |
-| API (FastAPI + AG-UI) | ✅ live-verified ("15 wells not producing" via Nemotron free, verifier retry worked) | `backend/src/wellops/api/app.py`; run `cd backend && uv run uvicorn wellops.api.app:app --port 8000` | `uv run pytest -q tests/test_api.py` |
+| L0 substrate | ✅ done | `backend/src/kreatwit/substrate/` (ingest, views macros, report_facts, rules.yaml, schema.sql) | `cd backend && uv run python -m kreatwit.substrate.ingest && uv run pytest -q tests/test_substrate.py` (10 pass) |
+| L1 dq flags | ✅ done | `backend/src/kreatwit/trust/dq.py` | flags: hot_idle 36, recorded_status_stale 21, inspection_gap 14, repair_in_progress 8, nonstandard filename 2, ref-only-in-text 2 |
+| Contracts | ✅ done | `backend/src/kreatwit/contracts/__init__.py` (TS mirror at `frontend/src/contracts.ts`) | — |
+| L2 tools | ✅ done | `backend/src/kreatwit/tools/` (core, data, docs, entity, obligations) | `uv run pytest -q tests/test_tools.py` |
+| Memory | ✅ done | `backend/src/kreatwit/memory/` (assertions, conflicts, episodes) | — |
+| L3 agent + skills | ✅ built (tested with TestModel, not yet run on a real model) | `backend/src/kreatwit/agent/` (agent, prompt, skills, turn), `skills/*/SKILL.md` (9) | `uv run pytest -q tests/test_agent.py` |
+| L4 verifier | ✅ gates + output_validator | `backend/src/kreatwit/verify/gates.py` | backend `uv run pytest -q` (33 pass) |
+| API (FastAPI + AG-UI) | ✅ live-verified ("15 wells not producing" via Nemotron free, verifier retry worked) | `backend/src/kreatwit/api/app.py`; run `cd backend && uv run uvicorn kreatwit.api.app:app --port 8000` | `uv run pytest -q tests/test_api.py` |
 | L5 UI | ✅ LIVE against API (0434667): fixtures rebuilt from real tool output and verifier-checked; earlier note obsolete → (build+lint pass); not yet wired live. Mock fixtures contain made-up IDs (e.g. INS-0001-0211, CTX-0164-002) and say "unconfirmed until you decide" (contradicts ADR-013): never demo mock mode, replace fixtures with real data | `frontend/` | `npm i && npm run dev:mock`; screenshots: `node scripts/screenshots.mjs <dir>` |
 | L6 evals | 🟡 WIP (stream D): 18 golden cases (YAML + JSON schema), 60+ synthetic, scorers, Opik metrics, fault injection, key audit | `evals/` (own uv project) | key audit: **agrees 199, disagrees 0, not computable 77** (`evals/results/key_audit.md`) |
 | Mutated dataset | ✅ generator + checks; findings fixed in 5a98a76 (new well-type rules extracted from its manual, T200 fallback + dq flag; duplicate inspection ids flagged) | `evals/evals/mutate/` | evals `uv run pytest -q` (25 pass) |
@@ -59,8 +59,8 @@ github.com/FlytBaseAILabs/flytbase-ahc-swe-asset-intelligence-dataset). Re-clone
   over `skills/*/SKILL.md`, FallbackModel over `MODEL_FALLBACKS`) → verifier `output_validator` (grounding,
   re-execution, disclosure, conflicts, visual fit → ModelRetry ≤ 2) → FastAPI: `POST /api/agui` (headers
   `X-User-Id`, `X-Chat-Id`, `X-Clock-Today`), `GET /api/handles/{h}?chat_id=`, `GET /api/users`, `GET /api/chats?principal=`,
-  `POST /api/assertions/{id}/undo`, `GET /api/health`. Custom AG-UI events: `wellops.answer` (AnswerSpec JSON),
-  `wellops.verification`, `wellops.capability`, `wellops.conflict`. Tests use TestModel/FunctionModel (no network).
+  `POST /api/assertions/{id}/undo`, `GET /api/health`. Custom AG-UI events: `kreatwit.answer` (AnswerSpec JSON),
+  `kreatwit.verification`, `kreatwit.capability`, `kreatwit.conflict`. Tests use TestModel/FunctionModel (no network).
   Feedback semantics (ADR-013): corrections and rules commit immediately, attributed, original kept, Undo; claims
   contradicted by data are `unconfirmed`; only explicit corrections override detections; role never gates.
 - **C (UI):** Next.js + Tailwind, AG-UI client, component registry keyed by `Visual.type`, data fetched by handle,
@@ -85,12 +85,12 @@ github.com/FlytBaseAILabs/flytbase-ahc-swe-asset-intelligence-dataset). Re-clone
   Corrections, disputes and uploads change data_version, so stale answers never replay; action turns are never cached.
 - Feedback: "that's wrong" → dispute_data tool → proof card (record, author, rule, nearby notes, earlier corrections) →
   POST /api/disputes/{id}/resolve {correct|keep}. No correction on the user's word alone (pattern: AG-UI human-in-the-loop + provenance gating).
-- UI: paper/Argus aesthetic, live AG-UI run trace (wellops.trace), one primary figure per answer, Show work collapsed.
+- UI: paper/Argus aesthetic, live AG-UI run trace (kreatwit.trace), one primary figure per answer, Show work collapsed.
 - Live: Q1 8.7 s, Q6 15.9 s (49/42/42), dispute 16 s, cached repeats 3-5 ms.
 
 ## 4a'. ARCHITECTURE v2 (Hermes harness)
 UI (Next.js, client-side gen-UI) ─AG-UI SSE─▶ FastAPI /api/agui ─▶ hermes_bridge ─subprocess─▶ hermes/runner.py (Hermes AIAgent, own venv)
-Hermes ─MCP streamable HTTP─▶ /mcp (wellops.mcp_server, in the API process, shares DuckDB): 20 tools (status, downtime, spills, obligations,
+Hermes ─MCP streamable HTTP─▶ /mcp (kreatwit.mcp_server, in the API process, shares DuckDB): 20 tools (status, downtime, spills, obligations,
 RCA, costs, evidence, docs, sql, corrections, memory, show_visual, generate_image, ingest_file, analyze_image, list_media, user_tables).
 The bridge composes an AnswerSpec (text + show_visual queue) and runs the verifier gates plus tool_grounded; on failure it re-asks Hermes (≤2).
 Provider: settings.hermes_provider = nvidia (NVIDIA_API_KEY, integrate.api.nvidia.com) | openrouter. The OpenRouter free quota ran out on 10/17.
@@ -102,18 +102,18 @@ Evals: `evals.run --target hermes` (8e5dd7f). UI: 1422a47 (minimal answers, inli
 - Q6 top-3 downtime NE-7: resolve_entity → downtime → show_visual(bar) gives 49/42/42 (matches the key), 0 retries.
 - Q8 spills heatmap 2026: spills → show_visual(heatmap), passed after 1 corrective retry.
 - Ingestion: CSV upload creates the user_pump_vendors table, queryable by Hermes.
-Run: `cd backend && uv run uvicorn wellops.api.app:app --port 8000` (.env: NVIDIA_API_KEY, HERMES_PROVIDER=nvidia) and `cd frontend && npm run dev`.
+Run: `cd backend && uv run uvicorn kreatwit.api.app:app --port 8000` (.env: NVIDIA_API_KEY, HERMES_PROVIDER=nvidia) and `cd frontend && npm run dev`.
 
 ## 4c. DEMO RUNBOOK (presentation)
 1. API, Nemotron first (gemma4-e2b fails verifier retries; qwen3-vl untested at agent level):
-   `cd backend && MODEL_FALLBACKS="openrouter:nvidia/nemotron-3-super-120b-a12b:free,openrouter:poolside/laguna-s-2.1:free,ollama:qwen3-vl-8b-32k" uv run uvicorn wellops.api.app:app --port 8000`
+   `cd backend && MODEL_FALLBACKS="openrouter:nvidia/nemotron-3-super-120b-a12b:free,openrouter:poolside/laguna-s-2.1:free,ollama:qwen3-vl-8b-32k" uv run uvicorn kreatwit.api.app:app --port 8000`
 2. UI live: `cd frontend && npm run dev` → http://localhost:3000 (Q1 live: 30 s, 6/6 gates, 0 retries).
 3. Backup if the free quota runs out (about 50 req/day): `npm run dev:mock`. That's a replay of REAL tool outputs (make_fixtures.py, all verifier gates pass). Say so.
 4. Evals: fake target 18/18 (harness check), key audit 199/0/77, meta-eval recall 1.00; live gemma run 0/2 (verifier retries exhausted); see docs/WRITEUP.md.
 5. Board: header toggle Chat → Chat+Board → Board (e19f9bf): dot-grid canvas, drag/resize cards, recharts tooltips, type switch, sort, brush, click → evidence.
 6. Voice (558b00b): mic = browser Web Speech (free); Listen/Voice mode = POST /api/tts → ElevenLabs flash v2.5, voice Sarah, ≤400 chars, disk cache, stops on 401/402/403. Key only in .env.
 7. Framing: docs/HARNESS.md (harness-engineering primer mapping).
-8. Known: Q7 map initial view clips WELL-0151 (pan); no wellops.verification event on RUN_ERROR; qwen3-vl-8b on RTX >6 min per question, gemma4-e2b fails gates.
+8. Known: Q7 map initial view clips WELL-0151 (pan); no kreatwit.verification event on RUN_ERROR; qwen3-vl-8b on RTX >6 min per question, gemma4-e2b fails gates.
 
 ## 4d. Local-model findings (7e smoke, 5 questions): qwen3-vl-8b 2/5, gemma4-e2b 1/5 (hollow)
 Main failure: the model replies in plain text instead of calling final_result, which eats the output retries. Next harness fixes, in order:

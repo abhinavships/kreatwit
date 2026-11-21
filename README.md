@@ -1,4 +1,4 @@
-# WellOps Copilot
+# Kreatwit
 
 **A chat copilot over oil-field asset data that refuses to give an answer it cannot prove.**
 
@@ -12,7 +12,7 @@ Built solo for FlytBase Hack Day (Asset Intelligence Copilot track), judged on b
 
 Most data copilots trust the model. This one treats the model as the least reliable part of the system.
 
-| Problem | What WellOps does |
+| Problem | What Kreatwit does |
 |---|---|
 | Models invent numbers | **Claims-bound answers.** Each figure is a claim `{value, handle, column, row_key}` that is re-executed against its result. A mismatch sends a diff back to the model, at most twice, and otherwise no answer is emitted. |
 | Data lies too | **Trust layer.** A data audit found 24 traps (stale status snapshots, hot wellheads that are idle, corrections stored as notes). Each becomes a data-quality flag that travels with the result. |
@@ -33,7 +33,7 @@ L1  Trust          provenance on every fact · data-quality flags · overlays ·
 L0  Substrate      one DuckDB file: raw tables · canonical views · report facts · full-text search
 ```
 
-Each layer talks to the next through a typed contract (`backend/src/wellops/contracts`, mirrored in `frontend/src/contracts.ts`), so a layer can be replaced without rewiring the ones above it.
+Each layer talks to the next through a typed contract (`backend/src/kreatwit/contracts`, mirrored in `frontend/src/contracts.ts`), so a layer can be replaced without rewiring the ones above it.
 
 Large results never pass through the model: tools return a preview plus a **handle**, and the UI fetches full rows by handle.
 
@@ -64,7 +64,7 @@ That last row is the design working as intended, and also its cost: a very small
 Backend (Python 3.12, [uv](https://docs.astral.sh/uv/)):
 
 ```bash
-cd agent-copilot/backend && cp ../.env.example ../.env && uv run uvicorn wellops.api.app:app --port 8000
+cd agent-copilot/backend && cp ../.env.example ../.env && uv run uvicorn kreatwit.api.app:app --port 8000
 ```
 
 Frontend:
@@ -108,7 +108,7 @@ fly deploy --ha=false
 Accounts are created by an operator, not by sign-up. Each account signs in as one dataset user (`U-101` ... see `/api/users`):
 
 ```bash
-fly ssh console --pty -C "sh -c 'cd /app/backend && uv run --no-sync python -m wellops.api.auth add you@example.com U-101'"
+fly ssh console --pty -C "sh -c 'cd /app/backend && uv run --no-sync python -m kreatwit.api.auth add you@example.com U-101'"
 ```
 
 The same command takes `list` and `remove <email>`. Locally, sign-in stays off unless `AUTH_SECRET` is set in `.env`.

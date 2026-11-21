@@ -16,7 +16,7 @@ class ScorerMetric(base_metric.BaseMetric):
     scorer_name = ""
 
     def __init__(self, name: str | None = None):
-        super().__init__(name=name or f"wellops_{self.scorer_name}", track=False)
+        super().__init__(name=name or f"kreatwit_{self.scorer_name}", track=False)
 
     def score(self, turns: list[dict] | None = None, **ignored) -> ScoreResult:
         vals, reasons = [], []
@@ -46,7 +46,7 @@ for _n, _c in METRIC_CLASSES.items():
 class AggregateMetric(base_metric.BaseMetric):
     """0.5 facts + 0.25 evidence + 0.25 visual; leak => 0."""
 
-    def __init__(self, name: str = "wellops_aggregate"):
+    def __init__(self, name: str = "kreatwit_aggregate"):
         super().__init__(name=name, track=False)
 
     def score(self, turns: list[dict] | None = None, **ignored) -> ScoreResult:
@@ -61,7 +61,7 @@ class AggregateMetric(base_metric.BaseMetric):
 class PassMetric(base_metric.BaseMetric):
     """1.0 if every scored turn passed every applicable scorer (building block for pass^k)."""
 
-    def __init__(self, name: str = "wellops_pass"):
+    def __init__(self, name: str = "kreatwit_pass"):
         super().__init__(name=name, track=False)
 
     def score(self, turns: list[dict] | None = None, **ignored) -> ScoreResult:

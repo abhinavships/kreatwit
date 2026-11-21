@@ -2,10 +2,10 @@ from datetime import date
 
 import pytest
 
-from wellops import tools
-from wellops.contracts import RunDeps
-from wellops.settings import settings
-from wellops.substrate import ingest
+from kreatwit import tools
+from kreatwit.contracts import RunDeps
+from kreatwit.settings import settings
+from kreatwit.substrate import ingest
 
 TODAY = date(2026, 10, 17)
 settings.rag_embed = False  # no embedding calls from tests; test_rag installs a fake embedder
@@ -13,7 +13,7 @@ settings.rag_embed = False  # no embedding calls from tests; test_rag installs a
 
 @pytest.fixture(scope="session")
 def db(tmp_path_factory):
-    path = tmp_path_factory.mktemp("wellops") / "t.duckdb"
+    path = tmp_path_factory.mktemp("kreatwit") / "t.duckdb"
     con = ingest.connect(path)
     con.execute("SET TimeZone='UTC'")  # raw timestamps are UTC; never ingest in a local zone
     ingest.ingest(settings.data_dir, "sample", con)

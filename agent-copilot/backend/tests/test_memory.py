@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 
-from wellops import tools as T
-from wellops.contracts import AssertionIn
-from wellops.memory import assert_fact, list_conflicts, recall_episodes, record_episode, undo_assertion
+from kreatwit import tools as T
+from kreatwit.contracts import AssertionIn
+from kreatwit.memory import assert_fact, list_conflicts, recall_episodes, record_episode, undo_assertion
 
 
 def ne8_not_producing(deps, who="U-201"):

@@ -45,7 +45,7 @@ PRIORITY = {c.key: i for i, c in enumerate(CATEGORIES)}
 WINDOW_FREE_TOOLS = {"resolve_entity", "show_visual", "sql", "read_doc", "search_reports", "recall_episodes",
                      "recall_conversations", "load_skill", "list_skills", "read_skill_file", "search_docs"}
 TIMEOUT_RE = re.compile(r"timeout|timed out|ReadTimeout", re.I)
-TRUNCATED_AT = 2000  # backend/src/wellops/api/hermes_bridge.py caps TOOL_CALL_RESULT content
+TRUNCATED_AT = 2000  # backend/src/kreatwit/api/hermes_bridge.py caps TOOL_CALL_RESULT content
 NAMED_NUM_RE = re.compile(r"\b(?:Well|Block|Area|Pad|Unit)\s+\d+\b", re.I)  # "NE-08 Well 172" is a name, not a figure
 RETRIES_RE = re.compile(r"maximum output retries|verifier|retries exhausted", re.I)
 
@@ -194,8 +194,8 @@ def classify_turn(turn: dict, truth: dict | None = None) -> Classification:
     if v == 0.0:
         hits.append(Hit("memory_leak", dict(hits=d.get("hits", []))))
 
-    # verifier gates streamed by the API (wellops.verification): a final failing gate means an ungrounded answer
-    for ver in (meta.get("events") or {}).get("wellops.verification", []) or []:
+    # verifier gates streamed by the API (kreatwit.verification): a final failing gate means an ungrounded answer
+    for ver in (meta.get("events") or {}).get("kreatwit.verification", []) or []:
         bad = [g.get("name") for g in (ver or {}).get("gates", []) if g.get("ok") is False]
         if (ver or {}).get("ok") is False or bad:
             hits.append(Hit("ungrounded_claim", dict(source="verifier", failed_gates=bad)))

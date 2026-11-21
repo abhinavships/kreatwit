@@ -49,7 +49,7 @@ export function QaExplorer() {
     <div className="paper min-h-dvh">
       <header className="sticky top-0 z-20 border-b border-line/70 bg-bg/70 backdrop-blur">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3 sm:px-6">
-          <h1 className="label"><span className="text-fg">WellOps</span> · QA notebook</h1>
+          <h1 className="label"><span className="text-fg">Kreatwit</span> · QA notebook</h1>
           <nav className="flex gap-1" aria-label="Views">
             {TABS.map((t) => (
               <button key={t.key} type="button" onClick={() => go(t.key)} aria-current={tab === t.key ? "page" : undefined}

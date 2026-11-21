@@ -32,7 +32,7 @@ export const MOCK_CHAT_FOLLOWUP = "Mock mode only replays the example questions.
 /** Build the (non-timed) AG-UI event list for a scenario; the mock transport adds delays. */
 export function scenarioEvents(s: Scenario): { event: AguiEvent; delay: number }[] {
   const out: { event: AguiEvent; delay: number }[] = [{ event: { type: "RUN_STARTED", threadId: "mock", runId: "mock-run" }, delay: 80 }];
-  s.skills.forEach((k) => out.push({ event: { type: "CUSTOM", name: "wellops.capability", value: { kind: "skill", name: k, action: "loaded" } }, delay: 120 }));
+  s.skills.forEach((k) => out.push({ event: { type: "CUSTOM", name: "kreatwit.capability", value: { kind: "skill", name: k, action: "loaded" } }, delay: 120 }));
   for (const [idx, t] of s.tools.entries()) {
     const id = `tc-${s.id}-${idx}`;
     const result = t.result as ToolResult;
@@ -48,10 +48,10 @@ export function scenarioEvents(s: Scenario): { event: AguiEvent; delay: number }
   const words = s.answer.markdown.split(/(\s+)/);
   for (let i = 0; i < words.length; i += 3) out.push({ event: { type: "TEXT_MESSAGE_CONTENT", messageId: mid, delta: words.slice(i, i + 3).join("") }, delay: 22 });
   out.push({ event: { type: "TEXT_MESSAGE_END", messageId: mid }, delay: 30 });
-  for (const c of s.answer.conflicts ?? []) out.push({ event: { type: "CUSTOM", name: "wellops.conflict", value: c }, delay: 50 });
-  out.push({ event: { type: "CUSTOM", name: "wellops.verification", value: s.verification }, delay: 200 });
-  out.push({ event: { type: "CUSTOM", name: "wellops.usage", value: s.usage }, delay: 20 });
-  out.push({ event: { type: "CUSTOM", name: "wellops.answer", value: s.answer }, delay: 80 });
+  for (const c of s.answer.conflicts ?? []) out.push({ event: { type: "CUSTOM", name: "kreatwit.conflict", value: c }, delay: 50 });
+  out.push({ event: { type: "CUSTOM", name: "kreatwit.verification", value: s.verification }, delay: 200 });
+  out.push({ event: { type: "CUSTOM", name: "kreatwit.usage", value: s.usage }, delay: 20 });
+  out.push({ event: { type: "CUSTOM", name: "kreatwit.answer", value: s.answer }, delay: 80 });
   out.push({ event: { type: "RUN_FINISHED", threadId: "mock", runId: "mock-run" }, delay: 30 });
   return out;
 }

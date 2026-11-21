@@ -19,7 +19,7 @@ export interface Turn {
 export interface TraceStep { name: string; ms: number; ok: boolean; detail?: string }
 export interface RunTrace { steps: TraceStep[]; total_ms: number }
 
-const storeKey = (chatId: string) => `wellops.turns.${chatId}`;
+const storeKey = (chatId: string) => `kreatwit.turns.${chatId}`;
 export function loadTurns(chatId: string): Turn[] {
   try { const s = localStorage.getItem(storeKey(chatId)); return s ? (JSON.parse(s) as Turn[]).map((t) => ({ ...t, status: t.status === "running" ? "done" : t.status })) : []; } catch { return []; }
 }
@@ -45,13 +45,13 @@ export function reduceEvent(t: Turn, ev: AguiEvent, now = Date.now()): Turn {
     case "STATE_DELTA": return { ...t, stateDeltas: [...(t.stateDeltas ?? []), ev.delta] };
     case "CUSTOM": {
       switch (ev.name) {
-        case "wellops.answer": { const a = ev.value as AnswerSpec; return { ...t, answer: a, text: a.markdown ?? t.draft ?? t.text }; }
-        case "wellops.verification": return { ...t, verification: ev.value as VerificationEvent };
-        case "wellops.capability": return { ...t, capabilities: [...t.capabilities, ev.value as CapabilityEvent] };
-        case "wellops.conflict": return { ...t, conflicts: [...t.conflicts, ev.value as Conflict] };
-        case "wellops.usage": return { ...t, usage: { ...t.usage, ...(ev.value as UsageEvent) } };
-        case "wellops.trace": return { ...t, trace: ev.value as RunTrace };
-        case "wellops.cache": return { ...t, cache: ev.value as Turn["cache"] };
+        case "kreatwit.answer": { const a = ev.value as AnswerSpec; return { ...t, answer: a, text: a.markdown ?? t.draft ?? t.text }; }
+        case "kreatwit.verification": return { ...t, verification: ev.value as VerificationEvent };
+        case "kreatwit.capability": return { ...t, capabilities: [...t.capabilities, ev.value as CapabilityEvent] };
+        case "kreatwit.conflict": return { ...t, conflicts: [...t.conflicts, ev.value as Conflict] };
+        case "kreatwit.usage": return { ...t, usage: { ...t.usage, ...(ev.value as UsageEvent) } };
+        case "kreatwit.trace": return { ...t, trace: ev.value as RunTrace };
+        case "kreatwit.cache": return { ...t, cache: ev.value as Turn["cache"] };
         default: return t;
       }
     }

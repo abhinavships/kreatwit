@@ -1,6 +1,6 @@
 > How this maps onto harness engineering (Eval(M,H,E,B), frozen vs editable layers, verification, held-out split): [HARNESS.md](HARNESS.md)
 
-# WellOps Copilot: write-up
+# Kreatwit: write-up
 
 FlytBase Hack Day, Asset Intelligence Copilot. A chat copilot over an oil-field dataset (200 wells, ~40k
 inspections, ~5.7k repairs, ~1.5k free-text reports, manuals and SOPs) that answers with grounded numbers,
@@ -36,8 +36,8 @@ so layers can be swapped independently.
   never from the model. `output_type=AnswerSpec`. Nine playbook skills (`skills/*/SKILL.md`) are loaded on
   demand. The tool list stays fixed, so prompts stay cache-stable. A `FallbackModel` runs a local Ollama model first,
   then free OpenRouter models.
-- **API.** FastAPI. `POST /api/agui` streams standard AG-UI events plus `wellops.answer`, `wellops.verification`,
-  `wellops.conflict`, `wellops.capability` and `wellops.usage`. The server owns the transcript per chat.
+- **API.** FastAPI. `POST /api/agui` streams standard AG-UI events plus `kreatwit.answer`, `kreatwit.verification`,
+  `kreatwit.conflict`, `kreatwit.capability` and `kreatwit.usage`. The server owns the transcript per chat.
 - **UI (L5).** Next.js. A component registry keyed by `Visual.type` (status card, table, line with threshold and
   not-producing bands, bar, map, heatmap, obligation timeline, conflict card, correction diff with Undo, evidence
   chain). An evidence drawer shows the cited record. An X-ray panel shows the tools and skills used, the gate

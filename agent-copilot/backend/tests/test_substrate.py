@@ -11,8 +11,8 @@ import duckdb
 import pytest
 import yaml
 
-from wellops.settings import settings
-from wellops.substrate import ingest
+from kreatwit.settings import settings
+from kreatwit.substrate import ingest
 
 DS = "sample"
 NOW = "2026-10-17 23:59:59+00"
@@ -129,8 +129,8 @@ def test_q12_value_correction_overlay_keeps_original(con):
 
 
 def test_new_manual_rules_are_extracted_verbatim():
-    from wellops.settings import settings
-    from wellops.substrate.ingest import manual_rules, split_sections
+    from kreatwit.settings import settings
+    from kreatwit.substrate.ingest import manual_rules, split_sections
     rules, parent = manual_rules("T350", split_sections((settings.data_dir / "fleet/well-types/T350.md").read_text()))
     got = {r["param"]: (r["value"], r["section"], r["quote"]) for r in rules}
     assert got["production_delta_min_c"] == (20.0, "3", "at least 20 °C above ambient")  # same as rules.yaml

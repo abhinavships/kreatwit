@@ -2860,7 +2860,7 @@ wheels = [
 ]
 
 [[package]]
-name = "wellops"
+name = "kreatwit"
 version = "0.1.0"
 source = { editable = "../backend" }
 dependencies = [
@@ -2899,7 +2899,7 @@ dev = [
 ]
 
 [[package]]
-name = "wellops-evals"
+name = "kreatwit-evals"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
@@ -2908,7 +2908,7 @@ dependencies = [
     { name = "opik" },
     { name = "python-dotenv" },
     { name = "pyyaml" },
-    { name = "wellops" },
+    { name = "kreatwit" },
 ]
 
 [package.dev-dependencies]
@@ -2923,7 +2923,7 @@ requires-dist = [
     { name = "opik", specifier = ">=2.2.103" },
     { name = "python-dotenv", specifier = ">=1.2.4" },
     { name = "pyyaml", specifier = ">=6.0.3" },
-    { name = "wellops", editable = "../backend" },
+    { name = "kreatwit", editable = "../backend" },
 ]
 
 [package.metadata.requires-dev]

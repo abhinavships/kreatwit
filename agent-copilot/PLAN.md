@@ -1,4 +1,4 @@
-# WellOps Copilot — Master Plan (v4, build-ready)
+# Kreatwit — Master Plan (v4, build-ready)
 
 > FlytBase Hack Day · judged on **backend engineering · evaluation system · generative UI**.
 > Read with: [`DATA.md`](DATA.md) (structure, 24 traps, answer-key audit) · [`AUDIT.md`](AUDIT.md) ·
