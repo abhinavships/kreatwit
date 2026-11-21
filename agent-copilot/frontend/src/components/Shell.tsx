@@ -171,7 +171,7 @@ export function Shell({ account }: { account?: { email: string; onSignOut: () =>
 
   const switchUser = (id: string) => { setUserId(id); ls.set("kreatwit.user", id); setLeftOpen(false); };
   const sidebar = (
-    <Sidebar users={account ? users.filter((u) => u.user_id === userId) : users} account={account} userId={userId} onUser={switchUser} chats={chats} chatId={chatId} onChat={openChat}
+    <Sidebar users={users} account={account} userId={userId} onUser={switchUser} chats={chats} chatId={chatId} onChat={openChat}
       onNew={() => openChat(newChatId())} today={today} resetToday={serverToday} onToday={(d) => { setToday(d); ls.set("kreatwit.today", d); }} mock={MOCK} />
   );
   const xray = <XrayPanel turns={turns} selected={selTurn} onSelect={setSelTurn} />;

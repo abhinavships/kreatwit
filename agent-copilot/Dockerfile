@@ -1,5 +1,5 @@
-# Kreatwit backend. Build context: agent-copilot/ (the app reads ../skills and ../dataset relative to backend/).
-# Run ONE instance with a persistent volume at /data: DuckDB is single-writer and chat state is in-process.
+# Kreatwit: site, app and API in one image. Build context: agent-copilot/ (the app reads ../skills and ../dataset).
+# Run ONE instance with a persistent volume at /data: each account's DuckDB file lives there, and chat state is in-process.
 # The UI is a static export served by the API, so it calls the API on its own origin (empty NEXT_PUBLIC_API_BASE).
 FROM node:24-slim AS ui
 WORKDIR /ui
@@ -24,13 +24,16 @@ COPY skills /app/skills
 COPY --from=ui /ui/out /app/frontend/out
 COPY backend/src ./src
 RUN uv sync --frozen
+# full-text search extension baked in: workspace connections cannot download extensions (external access is off)
+RUN uv run --no-sync python -c "import duckdb; duckdb.connect().execute('INSTALL fts')"
 
-# Everything written at runtime lives on the volume: database, answer cache (next to the db), uploads, TTS cache.
+# Everything written at runtime lives on the volume: the template database, one folder per account under /data/ws,
+# uploads per account under /data/uploads, usage counters, TTS cache.
 ENV DATA_DIR=/app/dataset/sample-data DB_PATH=/data/kreatwit.duckdb PORT=8000
 RUN mkdir -p /data && ln -s /data/uploads uploads && ln -s /data/tts_cache .tts_cache
 VOLUME /data
 EXPOSE 8000
 
-# First boot builds the database from the dataset (~1 min); later boots reuse it, keeping corrections and chats.
-# Refuses to start without AUTH_SECRET: a public deployment must never run with sign-in off.
-CMD ["sh", "-c", ": \"${AUTH_SECRET:?set AUTH_SECRET (openssl rand -hex 32)}\" && mkdir -p /data/uploads /data/tts_cache && { [ -f \"$DB_PATH\" ] || uv run --no-sync python -m kreatwit.substrate.ingest; } && exec uv run --no-sync uvicorn kreatwit.api.app:app --host 0.0.0.0 --port \"$PORT\" --proxy-headers --forwarded-allow-ips \"*\""]
+# First boot builds the template database from the sample dataset (a few minutes); new accounts start from a copy.
+# Refuses to start without sign-in configured: a public deployment must never run with workspaces off.
+CMD ["sh", "-c", ": \"${AUTH_SECRET:?set AUTH_SECRET (openssl rand -hex 32)}\" \"${SUPABASE_URL:?set SUPABASE_URL}\" \"${SUPABASE_ANON_KEY:?set SUPABASE_ANON_KEY}\" && mkdir -p /data/uploads /data/tts_cache && { [ -f \"$DB_PATH\" ] || uv run --no-sync python -m kreatwit.substrate.ingest; } && exec uv run --no-sync uvicorn kreatwit.api.app:app --host 0.0.0.0 --port \"$PORT\" --proxy-headers --forwarded-allow-ips \"*\""]

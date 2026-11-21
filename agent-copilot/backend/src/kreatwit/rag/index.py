@@ -58,7 +58,9 @@ def _bulk(con, table: str, rows: list[dict], cols: str) -> None:
     """Insert many rows through a temp JSON file (DuckDB executemany is slow for thousands of rows)."""
     if not rows:
         return
-    fd, p = tempfile.mkstemp(suffix=".json")
+    from kreatwit.workspace import uploads_dir
+    (d := uploads_dir()).mkdir(parents=True, exist_ok=True)  # a sandboxed workspace can only read its own folder
+    fd, p = tempfile.mkstemp(suffix=".json", dir=d)
     with os.fdopen(fd, "w") as f:
         json.dump(rows, f, default=str)
     try:

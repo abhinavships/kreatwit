@@ -12,7 +12,7 @@ from conftest import TODAY
 
 @pytest.fixture(autouse=True)
 def uploads(tmp_path, monkeypatch, db):
-    monkeypatch.setattr(pipeline, "UPLOADS", tmp_path / "uploads")
+    monkeypatch.setattr(pipeline, "UPLOADS", lambda: tmp_path / "uploads")
     monkeypatch.setattr(pipeline, "ROOT", tmp_path)
     monkeypatch.setattr(ingest_tools, "ROOT", tmp_path)
     yield

@@ -14,7 +14,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse
 
 from kreatwit.ingest import pipeline
-from kreatwit.settings import ROOT
+from kreatwit.settings import ROOT, settings
 from kreatwit.tools.core import get_db
 
 router = APIRouter()
@@ -37,9 +37,12 @@ def _upload(body: bytes, content_type: str, request: Request) -> tuple[str, byte
 
 @router.post("/api/ingest")
 async def ingest(request: Request) -> dict:
+    from kreatwit import usage, workspace
+    limit = settings.max_upload_mb * 2**20 if workspace.CURRENT.get() else MAX_BYTES
     body = await request.body()
-    if len(body) > MAX_BYTES:
-        raise HTTPException(413, f"file larger than {MAX_BYTES // 2**20} MB")
+    if len(body) > limit:
+        raise HTTPException(413, f"file larger than {limit // 2**20} MB")
+    usage.take("uploads", settings.daily_uploads)
     name, data = _upload(body, request.headers.get("content-type", ""), request)
     with tempfile.TemporaryDirectory() as d:
         p = Path(d) / name

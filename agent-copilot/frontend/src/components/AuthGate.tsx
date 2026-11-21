@@ -1,63 +1,37 @@
 "use client";
-import { useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 import { API_BASE, MOCK } from "@/lib/api";
+import { authConfig, signOut, startServerSession } from "@/lib/auth";
 import { Shell } from "@/components/Shell";
 
-interface Me { auth: boolean; user_id?: string; email?: string }
+interface Me { auth: boolean; email?: string }
 
-/** Asks the server who is signed in. Sign-in off (local dev, mock) renders the app as before, with the user picker. */
+/** The app behind sign-in. Sign-in off (local dev, mock): the app as before. Otherwise no session: go to /login/. */
 export function AuthGate() {
-  const [me, setMe] = useState<Me | null | "anon">(MOCK ? { auth: false } : null);
+  const [me, setMe] = useState<Me | null>(MOCK ? { auth: false } : null);
   const [err, setErr] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
 
-  const accept = (m: Me) => {
-    // Shell and the board read the acting user from here on mount; the server ignores it and uses the session anyway
-    if (m.auth && m.user_id) { try { localStorage.setItem("kreatwit.user", m.user_id); } catch { /* ignore */ } }
-    setMe(m);
-  };
   useEffect(() => {
     if (MOCK) return;
-    fetch(`${API_BASE}/api/auth/me`).then((r) => (r.ok ? r.json().then(accept) : setMe("anon")))
-      .catch(() => setMe({ auth: false })); // backend offline: Shell shows its own load error
+    (async () => {
+      const r = await fetch(`${API_BASE}/api/auth/me`);
+      if (r.ok) return setMe((await r.json()) as Me);
+      if (!(await authConfig()).auth) return setMe({ auth: false });
+      // our cookie is gone or expired but Supabase may still hold a session: exchange it again
+      const e = await startServerSession();
+      if (e === "not signed in") return window.location.replace("/login/");
+      if (e) return setErr(e);
+      setMe((await (await fetch(`${API_BASE}/api/auth/me`)).json()) as Me);
+    })().catch(() => setMe({ auth: false })); // backend offline: Shell shows its own load error
   }, []);
 
-  const signIn = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    setBusy(true); setErr(null);
-    try {
-      const r = await fetch(`${API_BASE}/api/auth/login`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: f.get("email"), password: f.get("password") }),
-      });
-      if (r.ok) accept((await r.json()) as Me);
-      else setErr(r.status === 429 ? "Too many attempts. Try again in 15 minutes." : "Wrong email or password.");
-    } catch { setErr("Could not reach the server."); } finally { setBusy(false); }
-  };
-  const signOut = async () => {
-    await fetch(`${API_BASE}/api/auth/logout`, { method: "POST" }).catch(() => {});
-    setMe("anon");
-  };
-
-  if (me === null) return null;
-  if (me !== "anon") return <Shell account={me.auth ? { email: me.email ?? "", onSignOut: signOut } : undefined} />;
-  const field = "w-full rounded-lg border border-line bg-panel px-3 py-2 text-sm";
-  return (
-    <main className="grid min-h-screen place-items-center p-4">
-      <form onSubmit={signIn} className="w-full max-w-sm space-y-3 rounded-xl border border-line bg-panel p-6">
-        <h1 className="text-lg font-semibold">Sign in to Kreatwit</h1>
-        <label className="block text-sm">Email
-          <input name="email" type="email" required autoComplete="username" autoFocus className={`mt-1 ${field}`} />
-        </label>
-        <label className="block text-sm">Password
-          <input name="password" type="password" required autoComplete="current-password" className={`mt-1 ${field}`} />
-        </label>
-        {err && <p role="alert" className="text-sm text-bad">{err}</p>}
-        <button type="submit" disabled={busy} className="w-full rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-accent-fg hover:opacity-90 disabled:opacity-50">
-          {busy ? "Signing in…" : "Sign in"}
-        </button>
-      </form>
+  if (err) return (
+    <main className="grid min-h-screen place-items-center p-4 text-center">
+      <div><p className="text-bad">{err}</p><Link className="mt-3 inline-block underline" href="/login/">Back to sign in</Link></div>
     </main>
   );
+  if (me === null) return null;
+  const leave = async () => { await signOut(); window.location.replace("/"); };
+  return <Shell account={me.auth ? { email: me.email ?? "", onSignOut: leave } : undefined} />;
 }

@@ -220,6 +220,8 @@ def main() -> None:
     counts = ingest(data, ds, con)
     from kreatwit.rag.index import embed_missing
     print(json.dumps({"dataset_id": ds, **counts, "kb_vectors": embed_missing(con, ds)}, indent=2))
+    con.execute("CHECKPOINT")  # workspaces are file copies of this database: nothing may be left in the WAL
+    con.close()
 
 
 if __name__ == "__main__":

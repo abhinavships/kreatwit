@@ -18,20 +18,25 @@ from typing import Any
 from kreatwit.settings import ROOT, settings
 
 _LOCK = threading.Lock()
-_CON: sqlite3.Connection | None = None
+_CONS: dict[str, sqlite3.Connection] = {}  # one cache per database file (so one per workspace)
+_CONS_LOCK = threading.Lock()  # not _LOCK: callers hold _LOCK while calling con()
 MEMORY_WORDS = re.compile(r"\b(we|our|my|me|i|yesterday|earlier|last time|discussed|remember)\b", re.I)
 
 
 def con() -> sqlite3.Connection:
-    global _CON
-    if _CON is None:
-        path = settings.db_path.with_suffix(".cache.sqlite")  # one cache per database, never shared across servers
-        _CON = sqlite3.connect(path, check_same_thread=False)
-        _CON.execute("PRAGMA journal_mode=WAL")
-        _CON.execute("CREATE TABLE IF NOT EXISTS turns (k TEXT PRIMARY KEY, question TEXT, payload TEXT, ms INTEGER, at REAL)")
-        _CON.execute("CREATE TABLE IF NOT EXISTS tools (k TEXT PRIMARY KEY, payload TEXT, at REAL)")
-        _CON.execute("CREATE TABLE IF NOT EXISTS chat_turns (chat TEXT, principal TEXT, at REAL, question TEXT, events TEXT)")
-    return _CON
+    from pathlib import Path
+
+    from kreatwit.tools.core import get_db
+    path = str(Path(get_db().path).with_suffix(".cache.sqlite"))  # beside its database: never shared across workspaces
+    with _CONS_LOCK:
+        if path not in _CONS:
+            c = sqlite3.connect(path, check_same_thread=False)
+            c.execute("PRAGMA journal_mode=WAL")
+            c.execute("CREATE TABLE IF NOT EXISTS turns (k TEXT PRIMARY KEY, question TEXT, payload TEXT, ms INTEGER, at REAL)")
+            c.execute("CREATE TABLE IF NOT EXISTS tools (k TEXT PRIMARY KEY, payload TEXT, at REAL)")
+            c.execute("CREATE TABLE IF NOT EXISTS chat_turns (chat TEXT, principal TEXT, at REAL, question TEXT, events TEXT)")
+            _CONS[path] = c
+        return _CONS[path]
 
 
 def data_version() -> str:

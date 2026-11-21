@@ -32,7 +32,9 @@ from kreatwit.substrate.ingest import manual_rules, split_sections
 from kreatwit.tools.core import Db, get_db, jsonable
 
 DS = settings.active_dataset  # uploads join the dataset being served
-UPLOADS = ROOT / "backend" / "uploads"
+def UPLOADS() -> Path:  # noqa: N802  the active workspace's folder (kreatwit.workspace)
+    from kreatwit.workspace import uploads_dir
+    return uploads_dir()
 WELL_RE = re.compile(r"WELL-\d{4}", re.I)
 TABLE_EXT = {".csv", ".tsv", ".xlsx", ".json", ".jsonl", ".ndjson"}
 DOC_EXT = {".md", ".markdown", ".txt", ".pdf"}
@@ -270,8 +272,8 @@ def _coltype(db: Db, table: str, col: str) -> str:
 
 
 def _tmp_json(rows: list[dict]) -> str:
-    UPLOADS.mkdir(parents=True, exist_ok=True)
-    p = UPLOADS / f".tmp-{uuid.uuid4().hex[:8]}.json"
+    UPLOADS().mkdir(parents=True, exist_ok=True)
+    p = UPLOADS() / f".tmp-{uuid.uuid4().hex[:8]}.json"
     p.write_text(json.dumps(jsonable(rows), default=str))
     return str(p)
 
@@ -325,8 +327,8 @@ def _ingest_doc(db: Db, path: Path, filename: str, ext: str) -> IngestReport:
         text = f"# {Path(filename).stem}\n\n" + text
     secs = split_sections(text)
     doc_id = f"UP-{slug(filename)}"
-    UPLOADS.mkdir(parents=True, exist_ok=True)
-    stored = UPLOADS / f"{doc_id}{ext}"
+    UPLOADS().mkdir(parents=True, exist_ok=True)
+    stored = UPLOADS() / f"{doc_id}{ext}"
     stored.write_bytes(path.read_bytes())
     with db.lock:
         db.con.execute("DELETE FROM docs WHERE dataset_id=? AND doc_id=?", [DS, doc_id])
@@ -427,9 +429,9 @@ def _ingest_image(db: Db, path: Path, filename: str, ext: str, principal: str) -
         rep.summary = f"Already ingested as {m['media_id']}: {m['caption']}"
         rep.preview = [{k: m[k] for k in ("media_id", "caption", "text", "tags", "asset_id")}]
         return rep
-    UPLOADS.mkdir(parents=True, exist_ok=True)
+    UPLOADS().mkdir(parents=True, exist_ok=True)
     mid = f"MED-{sha[:10]}"
-    stored = UPLOADS / f"{mid}{ext}"
+    stored = UPLOADS() / f"{mid}{ext}"
     stored.write_bytes(data)
     caption, text, tags, model = "", "", [], None
     try:

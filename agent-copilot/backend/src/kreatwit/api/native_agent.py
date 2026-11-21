@@ -47,8 +47,16 @@ def tools() -> list[Tool]:
 
 @lru_cache(maxsize=4)
 def agent(model: str, base_url: str, api_key: str) -> Agent:
-    m = OpenAIChatModel(model, provider=OpenAIProvider(base_url=base_url, api_key=api_key))
-    return Agent(m, tools=tools(), retries=2, name="kreatwit")
+    """The model, then settings.llm_fallbacks, each with a hard per-request timeout: a busy or hung provider moves on
+    to the next model instead of leaving the chat spinning (Gemini returned 503s and hung for days in Nov 2026)."""
+    from openai import AsyncOpenAI
+    from pydantic_ai.models.fallback import FallbackModel
+
+    from kreatwit.settings import settings
+    names = list(dict.fromkeys([model, *(m.strip() for m in settings.llm_fallbacks.split(",") if m.strip())]))
+    client = AsyncOpenAI(base_url=base_url, api_key=api_key, timeout=settings.llm_timeout_s, max_retries=1)
+    models = [OpenAIChatModel(n, provider=OpenAIProvider(openai_client=client)) for n in names]
+    return Agent(models[0] if len(models) == 1 else FallbackModel(*models), tools=tools(), retries=2, name="kreatwit")
 
 
 async def run_native(deps: RunDeps, req: dict) -> AsyncIterator[dict]:

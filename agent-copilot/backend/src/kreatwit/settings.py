@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     llm_provider: str = "gemini"  # Google OpenAI-compatible endpoint
     llm_model: str = ""  # default per provider below
+    llm_fallbacks: str = "gemini-3.1-flash-lite"  # comma-separated, tried in order when the model errors or times out
+    llm_timeout_s: float = 45.0  # per model request; then the next fallback model is tried
     rag_embed: bool = True  # dense layer of search_knowledge (Gemini embeddings); False = BM25 only
     rag_embed_model: str = "gemini-embedding-001"
     rag_embed_dims: int = 768
@@ -36,7 +38,12 @@ class Settings(BaseSettings):
     skills_learn: bool = True  # distill/reinforce skills from finished turns (skills.on_turn_complete)
     skills_llm_polish: bool = False  # optional Gemini rewrite of auto-skill name/description (never in tests)
     skills_llm_model: str = "gemini-3.5-flash-lite"
-    auth_secret: str = ""  # signs session cookies; empty = sign-in off (local dev). See kreatwit.api.auth
+    auth_secret: str = ""  # signs session cookies; empty = sign-in and workspaces off (local dev). See kreatwit.api.auth
+    supabase_url: str = ""  # https://<project>.supabase.co
+    supabase_anon_key: str = ""  # public (publishable) key; the browser uses it too
+    daily_questions: int = 40  # per account, public server only (kreatwit.usage)
+    daily_uploads: int = 20
+    max_upload_mb: int = 10
     cors_origins: str = "*"  # comma-separated allowed browser origins; set to the frontend URL in production
     self_url: str = "http://127.0.0.1:8000"  # where this API (and its /mcp) is reachable from local agents
     judge_enabled: bool = True  # LLM-as-a-judge on every live answer (kreatwit.qa.judge); no-op without GEMINI_API_KEY

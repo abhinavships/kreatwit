@@ -1,10 +1,10 @@
-"""Accounts and sessions. Off unless AUTH_SECRET is set (local dev, tests); the Docker image refuses to start without it.
+"""Sign-in through Supabase, and the per-request workspace. Off unless AUTH_SECRET is set (local dev, tests, evals).
 
-An account is an email + password mapped to one dataset user (the principal). The middleware is the only place identity
-enters: it verifies the session cookie, then overwrites X-User-Id and ?principal=, so no endpoint trusts the client.
-
-Accounts live in their own SQLite file because the API process holds the DuckDB lock, so the CLI can add users while
-the server runs:  python -m kreatwit.api.auth add <email> <user_id> | list | remove <email>
+Supabase owns accounts: sign-up, email verification, password reset. The browser signs in with supabase-js, then
+POSTs its access token to /api/auth/session once; the server checks it with Supabase and sets its own signed,
+HttpOnly cookie. Every protected request is tied to that account's workspace (kreatwit.workspace) by the middleware,
+so no endpoint can be pointed at another account's data. Inside a workspace, the dataset persona (X-User-Id) is
+the user's own choice: it only changes whose view of their own copy they see.
 """
 
 from __future__ import annotations
@@ -13,24 +13,20 @@ import base64
 import hashlib
 import hmac
 import json
-import os
-import sqlite3
-import sys
 import time
-from urllib.parse import parse_qsl, urlencode
 
+import httpx
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
+from kreatwit import workspace
 from kreatwit.settings import settings
 
 COOKIE = "kreatwit_session"
 TTL = 7 * 24 * 3600
-OPEN = {"/api/health", "/api/auth/login", "/api/auth/logout", "/api/auth/me"}
-PROTECTED = ("/api/", "/mcp", "/skills-mcp")  # everything else is the static UI
-MAX_FAILS, LOCK_S = 5, 15 * 60
-# ponytail: lockout counters are in-process (fine for the single instance DuckDB allows); move to the store if scaled out
-_FAILS: dict[str, tuple[int, float]] = {}
+OPEN = {"/api/health", "/api/auth/session", "/api/auth/logout", "/api/auth/me", "/api/auth/config"}
+PROTECTED = ("/api/",)  # everything else is the static site
+HIDDEN = ("/mcp", "/skills-mcp")  # MCP for local agent clients; not exposed on a public, multi-account server
 
 router = APIRouter(prefix="/api/auth")
 
@@ -39,30 +35,12 @@ def enabled() -> bool:
     return bool(settings.auth_secret)
 
 
-def _con() -> sqlite3.Connection:
-    con = sqlite3.connect(settings.db_path.with_name("accounts.sqlite"))
-    con.execute("CREATE TABLE IF NOT EXISTS accounts (email TEXT PRIMARY KEY, pw TEXT NOT NULL, user_id TEXT NOT NULL)")
-    return con
-
-
-def hash_pw(password: str, salt: bytes | None = None) -> str:
-    salt = salt or os.urandom(16)
-    return salt.hex() + "$" + hashlib.scrypt(password.encode(), salt=salt, n=2**14, r=8, p=1).hex()
-
-
-def check_pw(password: str, stored: str) -> bool:
-    return hmac.compare_digest(hash_pw(password, bytes.fromhex(stored.split("$")[0])), stored)
-
-
-_DUMMY = hash_pw("-")  # unknown emails cost the same as known ones
-
-
 def _mac(body: str) -> str:
     return hmac.new(settings.auth_secret.encode(), body.encode(), hashlib.sha256).hexdigest()
 
 
-def sign(user_id: str, email: str, ttl: int = TTL) -> str:
-    raw = json.dumps({"u": user_id, "e": email, "x": int(time.time()) + ttl}).encode()
+def sign(ws: str, email: str, ttl: int = TTL) -> str:
+    raw = json.dumps({"w": ws, "e": email, "x": int(time.time()) + ttl}).encode()
     body = base64.urlsafe_b64encode(raw).decode().rstrip("=")  # no padding: "=" would make the cookie value quoted
     return f"{body}.{_mac(body)}"
 
@@ -73,6 +51,7 @@ def verify(token: str | None) -> dict | None:
         return None
     try:
         s = json.loads(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)))
+        workspace.check(s.get("w", ""))
     except ValueError:
         return None
     return s if s.get("x", 0) > time.time() else None
@@ -88,46 +67,68 @@ def _cookie(headers: list[tuple[bytes, bytes]]) -> str | None:
     return None
 
 
+async def _reply(send, status: int, detail: str) -> None:
+    await send({"type": "http.response.start", "status": status, "headers": [(b"content-type", b"application/json")]})
+    await send({"type": "http.response.body", "body": json.dumps({"detail": detail}).encode()})
+
+
 class AuthMiddleware:
-    """Pure ASGI so it also covers the mounted MCP apps and streaming responses."""
+    """Pure ASGI so it also covers streaming responses; sets workspace.CURRENT for the whole request."""
 
     def __init__(self, app):
         self.app = app
 
     async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or not enabled():
+            return await self.app(scope, receive, send)
         path = scope.get("path", "")
-        if (scope["type"] != "http" or not enabled() or scope["method"] == "OPTIONS" or path in OPEN
-                or not path.startswith(PROTECTED)):
+        if path.startswith(HIDDEN):
+            return await _reply(send, 404, "not found")
+        if scope["method"] == "OPTIONS" or path in OPEN or not path.startswith(PROTECTED):
             return await self.app(scope, receive, send)
         s = verify(_cookie(scope["headers"]))
         if not s:
-            await send({"type": "http.response.start", "status": 401, "headers": [(b"content-type", b"application/json")]})
-            return await send({"type": "http.response.body", "body": b'{"detail":"sign in required"}'})
-        headers = [(k, v) for k, v in scope["headers"] if k != b"x-user-id"] + [(b"x-user-id", s["u"].encode())]
-        qs = [(k, v) for k, v in parse_qsl(scope["query_string"].decode("latin-1"), keep_blank_values=True) if k != "principal"]
-        scope = {**scope, "headers": headers, "query_string": urlencode(qs + [("principal", s["u"])]).encode()}
-        await self.app(scope, receive, send)
+            return await _reply(send, 401, "sign in required")
+        token = workspace.CURRENT.set(s["w"])
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            workspace.CURRENT.reset(token)
 
 
-class Login(BaseModel):
-    email: str
-    password: str
+def supabase_user(access_token: str) -> dict | None:
+    """Ask Supabase who owns this access token (works for any JWT signing setup; one call per sign-in)."""
+    r = httpx.get(f"{settings.supabase_url.rstrip('/')}/auth/v1/user", timeout=10,
+                  headers={"apikey": settings.supabase_anon_key, "Authorization": f"Bearer {access_token}"})
+    return r.json() if r.status_code == 200 else None
 
 
-@router.post("/login")
-def login(body: Login, request: Request, response: Response) -> dict:
-    email = body.email.strip().lower()
-    fails, until = _FAILS.get(email, (0, 0.0))
-    if fails >= MAX_FAILS and time.time() < until:
-        raise HTTPException(429, "too many attempts, try again later")
-    row = _con().execute("SELECT pw, user_id FROM accounts WHERE email=?", [email]).fetchone()
-    if not check_pw(body.password, row[0] if row else _DUMMY) or not row:
-        _FAILS[email] = (fails + 1, time.time() + LOCK_S)
-        raise HTTPException(401, "wrong email or password")
-    _FAILS.pop(email, None)
-    response.set_cookie(COOKIE, sign(row[1], email), max_age=TTL, httponly=True, samesite="lax",
+class SessionIn(BaseModel):
+    access_token: str
+
+
+@router.get("/config")
+def config() -> dict:
+    """Public values the browser needs to talk to Supabase (the anon key is meant to be public)."""
+    return {"auth": enabled(), "supabase_url": settings.supabase_url, "supabase_anon_key": settings.supabase_anon_key}
+
+
+@router.post("/session")
+def session(body: SessionIn, request: Request, response: Response) -> dict:
+    if not enabled():
+        raise HTTPException(404, "sign-in is off")
+    u = supabase_user(body.access_token)
+    if not u or not u.get("id"):
+        raise HTTPException(401, "session expired, sign in again")
+    if not (u.get("email_confirmed_at") or u.get("confirmed_at")):
+        raise HTTPException(403, "confirm your email first")
+    try:
+        ws = workspace.check(u["id"])
+    except ValueError as e:
+        raise HTTPException(401, "unexpected account id") from e
+    response.set_cookie(COOKIE, sign(ws, u.get("email", "")), max_age=TTL, httponly=True, samesite="lax",
                         secure=request.url.scheme == "https")
-    return {"auth": True, "user_id": row[1], "email": email}
+    return {"auth": True, "email": u.get("email", "")}
 
 
 @router.post("/logout")
@@ -143,35 +144,4 @@ def me(request: Request) -> dict:
     s = verify(request.cookies.get(COOKIE))
     if not s:
         raise HTTPException(401, "sign in required")
-    return {"auth": True, "user_id": s["u"], "email": s["e"]}
-
-
-def add_account(email: str, password: str, user_id: str) -> None:
-    known = {u["user_id"] for u in json.loads((settings.data_dir / "fleet/users.json").read_text())["users"]}
-    if user_id not in known:
-        raise SystemExit(f"unknown user_id {user_id}; one of: {', '.join(sorted(known))}")
-    if len(password) < 10:
-        raise SystemExit("password must be at least 10 characters")
-    with _con() as con:
-        con.execute("INSERT OR REPLACE INTO accounts VALUES (?,?,?)", [email.strip().lower(), hash_pw(password), user_id])
-
-
-def main() -> None:
-    match sys.argv[1:]:
-        case ["add", email, user_id]:
-            import getpass
-            pw = getpass.getpass("Password: ") if sys.stdin.isatty() else sys.stdin.readline().rstrip("\n")
-            add_account(email, pw, user_id)
-            print(f"ok: {email.lower()} signs in as {user_id}")
-        case ["list"]:
-            for email, user_id in _con().execute("SELECT email, user_id FROM accounts ORDER BY email"):
-                print(email, user_id)
-        case ["remove", email]:
-            with _con() as con:
-                print("removed" if con.execute("DELETE FROM accounts WHERE email=?", [email.lower()]).rowcount else "no such account")
-        case _:
-            raise SystemExit(__doc__)
-
-
-if __name__ == "__main__":
-    main()
+    return {"auth": True, "email": s["e"]}

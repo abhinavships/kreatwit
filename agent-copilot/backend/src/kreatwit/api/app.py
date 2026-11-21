@@ -48,8 +48,15 @@ RECORDS = {  # citation kind -> (table, id column)
 }
 
 
+_CHAT_OWNER: dict[str, str] = {}  # chat id -> workspace; in-memory chat state is keyed by chat id alone
+# ponytail: grows with chats since boot; fine for one machine, prune if memory shows it
+
+
 def deps_from(request: Request, chat_id: str | None = None) -> RunDeps:
     h = request.headers
+    from kreatwit import workspace
+    if (ws := workspace.CURRENT.get()) and _CHAT_OWNER.setdefault(chat_id or h.get("x-chat-id") or "default", ws) != ws:
+        raise HTTPException(403, "this chat belongs to another account")
     try:
         today = date.fromisoformat(h.get("x-clock-today") or str(settings.clock_today))
     except ValueError as e:
@@ -106,6 +113,8 @@ async def agui(request: Request) -> Response:
     except ValidationError as e:
         raise HTTPException(422, str(e)) from e
     deps = deps_from(request, request.headers.get("x-chat-id") or run_input.thread_id)
+    from kreatwit import usage
+    usage.take("questions", settings.daily_questions)
     if settings.harness == "native" and not AGENT_OVERRIDE:
         from fastapi.responses import StreamingResponse
         from .turn_stream import stream_turn
@@ -220,6 +229,10 @@ def judge_summary(last: int = 200, verdict: str | None = None, evaluator: str | 
 
 @app.get("/api/health")
 def health() -> dict:
+    from .auth import enabled
+    if enabled():  # public server: never open the template database here (workspaces are copied from it)
+        return {"ok": settings.db_path.exists(), "auth": True, "dataset": settings.active_dataset,
+                "clock_today": str(settings.clock_today), "instance": INSTANCE}
     n = get_db().rows("SELECT count(*) n FROM wells WHERE dataset_id=?", [settings.active_dataset])[0]["n"]
     return {"ok": True, "dataset": settings.active_dataset, "clock_today": str(settings.clock_today), "wells": n, "harness": settings.harness, "model": __import__("kreatwit.api.turn_stream", fromlist=["MODEL"]).MODEL,
             "instance": INSTANCE}

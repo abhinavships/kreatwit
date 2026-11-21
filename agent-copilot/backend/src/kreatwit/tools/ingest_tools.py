@@ -12,9 +12,21 @@ from kreatwit.settings import ROOT
 from .core import ToolError, get_db
 
 
+def _local(raw: str) -> Path:
+    """A file path from the model. On the public server only the account's own upload folder is reachable."""
+    from kreatwit import workspace
+    p = Path(raw).expanduser()
+    if workspace.CURRENT.get():
+        root = workspace.uploads_dir().resolve()
+        p = (root / p).resolve()  # an absolute p replaces root here, and is then checked like any other
+        if not p.is_relative_to(root):
+            raise ToolError("only files you uploaded can be ingested; upload it with the paperclip")
+    return p
+
+
 def ingest_file_tool(deps: RunDeps, path: str) -> dict:
     """Ingest a local file (table, document or image) and return the IngestReport as a dict."""
-    p = Path(path).expanduser()
+    p = _local(path)
     if not p.is_file():
         raise ToolError(f"no such file: {path}")
     return pipeline.ingest_file(p, p.name, principal=deps.principal, chat_id=deps.chat_id).model_dump()
@@ -32,7 +44,7 @@ def analyze_image(deps: RunDeps, media_id_or_path: str, question: str | None = N
     A path that is not ingested yet is ingested first (which describes it with one call)."""
     m = _media(media_id_or_path)
     if m is None:
-        p = Path(media_id_or_path).expanduser()
+        p = _local(media_id_or_path)
         if not p.is_file():
             raise ToolError(f"no media or file {media_id_or_path!r}; list_media shows what exists")
         rep = pipeline.ingest_file(p, p.name, principal=deps.principal, chat_id=deps.chat_id)

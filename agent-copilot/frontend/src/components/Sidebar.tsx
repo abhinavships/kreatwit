@@ -18,7 +18,7 @@ export function Sidebar(p: {
       </div>
 
       <section aria-label="User">
-        <h2 className="mb-1 px-1 text-[11px] font-semibold uppercase tracking-wide text-muted">{p.account ? "Signed in as" : "Acting as"}</h2>
+        <h2 className="mb-1 px-1 text-[11px] font-semibold uppercase tracking-wide text-muted">Acting as</h2>
         <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls="user-list"
           className="flex w-full items-center justify-between gap-2 rounded-lg border border-line bg-panel px-3 py-2 text-left hover:border-accent">
           <span className="min-w-0">

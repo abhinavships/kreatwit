@@ -1,23 +1,24 @@
-# fly.toml app configuration file generated for kreatwit-copilot on 2026-11-16T19:52:27+05:30
-#
-# See https://docs.fly.io/reference/configuration for information about how to use this file.
-#
+# Kreatwit on Fly.io: one machine, one volume. Do not scale out: accounts' databases live on this machine's volume.
+# Secrets (fly secrets set): AUTH_SECRET, SUPABASE_URL, SUPABASE_ANON_KEY, GEMINI_API_KEY. See README "Deploy".
 
-app = 'kreatwit-copilot'
+app = 'kreatwit'
 primary_region = 'sin'
 
-[build]
 [env]
-  CORS_ORIGINS = 'https://kreatwit-copilot.fly.dev'
+  CORS_ORIGINS = 'https://kreatwit.fly.dev'
+  LLM_MODEL = 'gemini-3.1-flash-lite'  # the larger Gemini models were overloaded on this key for days in Nov 2026
+  LLM_FALLBACKS = 'gemini-3.8-flash'
+  JUDGE_ENABLED = 'false'  # the LLM judge doubles model calls per answer; keep the free quota for answers
 
 [[mounts]]
   source = 'data'
   destination = '/data'
+  initial_size = '3gb'  # about 25 MB per account (a copy of the sample data) plus their uploads
 
 [http_service]
   internal_port = 8000
   force_https = true
-  auto_stop_machines = 'off'
+  auto_stop_machines = 'off'  # live chat state is in memory; a stopped machine forgets it
   auto_start_machines = true
   min_machines_running = 1
 

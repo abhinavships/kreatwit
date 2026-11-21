@@ -65,7 +65,8 @@ def jsonable(v: Any) -> Any:
 class Db:
     """One DuckDB file, one process. Cursors are cheap; a lock serialises use (DuckDB is single-writer)."""
 
-    def __init__(self, path: Path | str | None = None):
+    def __init__(self, path: Path | str | None = None, sandbox: Path | None = None):
+        """sandbox: a workspace's upload folder; the connection can then read files only there (see workspace.py)."""
         from kreatwit.substrate import ingest, views
 
         self.path = str(path or settings.db_path)
@@ -74,7 +75,21 @@ class Db:
         views.install(self.con)
         self.con.execute("""CREATE TABLE IF NOT EXISTS handles (chat_id VARCHAR, handle VARCHAR, result VARCHAR,
                             rows VARCHAR, PRIMARY KEY (chat_id, handle))""")
+        if sandbox is not None:
+            from kreatwit.workspace import MEMORY_LIMIT
+            self.con.execute(f"SET memory_limit='{MEMORY_LIMIT}'")
+            self.con.execute("SET threads=2")
+            try:  # extensions cannot be loaded once external access is off
+                self.con.execute("LOAD fts")
+            except duckdb.Error:
+                pass  # rag falls back to its plain scorer
+            self.con.execute("SET allowed_directories=?", [[str(sandbox.resolve()) + "/"]])
+            self.con.execute("SET enable_external_access=false")  # one-way: no files elsewhere, no ATTACH, no INSTALL
         self.lock = threading.RLock()
+
+    def close(self) -> None:
+        with self.lock:
+            self.con.close()
 
     def q(self, sql: str, params: list | None = None) -> tuple[list[str], list[dict[str, Any]]]:
         with self.lock:
@@ -90,14 +105,20 @@ class Db:
             self.con.execute(sql, params or [])
 
 
-_DB: Db | None = None
+_DB: Db | None = None  # set_db() override (tests, scripts)
+_DEFAULT: Db | None = None  # settings.db_path, when no workspace is active
 
 
 def get_db() -> Db:
-    global _DB
-    if _DB is None:
-        _DB = Db()
-    return _DB
+    global _DEFAULT
+    if _DB is not None:
+        return _DB
+    from kreatwit import workspace
+    if (ws := workspace.CURRENT.get()):
+        return workspace.get(ws)
+    if _DEFAULT is None:
+        _DEFAULT = Db()
+    return _DEFAULT
 
 
 def set_db(db: Db | None) -> None:
@@ -258,12 +279,13 @@ class HandleStore:
         self.mem.clear()
 
 
-_STORES: dict[int, HandleStore] = {}
 
 
 def store(db: Db | None = None) -> HandleStore:
     db = db or get_db()
-    return _STORES.setdefault(id(db), HandleStore(db))
+    if not hasattr(db, "handle_store"):  # on the Db itself: ids of closed workspace Dbs can be reused
+        db.handle_store = HandleStore(db)
+    return db.handle_store
 
 
 # --- result building -----------------------------------------------------------------------------
