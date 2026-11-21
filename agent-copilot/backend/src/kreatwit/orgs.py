@@ -5,6 +5,9 @@ a member row maps a Supabase user id to an org, a role and a principal (the user
 author of corrections, notes and chats). Membership is read on every request, so a role change or removal takes
 effect immediately, not when the cookie expires.
 
+Ways in: create an org (a personal workspace is just an org of one), accept an invite (automatic on sign-in with the
+invited email), or ask to join with an org id; an admin then approves the request with a role, or declines it.
+
 Roles: owner > admin > member > viewer.
   viewer  ask questions, see the org's data
   member  + upload data, correct records, resolve disputes
@@ -35,6 +38,8 @@ CREATE TABLE IF NOT EXISTS orgs (org_id TEXT PRIMARY KEY, name TEXT NOT NULL, cr
 CREATE TABLE IF NOT EXISTS members (org_id TEXT NOT NULL REFERENCES orgs, sb_uid TEXT PRIMARY KEY, email TEXT NOT NULL,
   name TEXT NOT NULL, title TEXT NOT NULL DEFAULT '', role TEXT NOT NULL, user_id TEXT NOT NULL, joined_at TEXT NOT NULL,
   UNIQUE (org_id, user_id));
+CREATE TABLE IF NOT EXISTS requests (sb_uid TEXT PRIMARY KEY, org_id TEXT NOT NULL REFERENCES orgs, email TEXT NOT NULL,
+  name TEXT NOT NULL, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS invites (org_id TEXT NOT NULL REFERENCES orgs, email TEXT NOT NULL, role TEXT NOT NULL,
   invited_by TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (org_id, email));
 """
@@ -47,6 +52,9 @@ def _con() -> sqlite3.Connection:
         _CON = sqlite3.connect(settings.db_path.with_name("orgs.sqlite"), check_same_thread=False)
         _CON.row_factory = sqlite3.Row
         _CON.executescript(SCHEMA)
+        if "sample" not in {r[1] for r in _CON.execute("PRAGMA table_info(orgs)")}:  # orgs made before this were sample copies
+            _CON.execute("ALTER TABLE orgs ADD COLUMN sample INTEGER NOT NULL DEFAULT 1")
+            _CON.commit()
     return _CON
 
 
@@ -72,7 +80,7 @@ def rank(role: str) -> int:
 
 
 def member(sb_uid: str) -> dict | None:
-    r = _q("""SELECT m.*, o.name AS org_name FROM members m JOIN orgs o USING (org_id) WHERE m.sb_uid=?""", [sb_uid])
+    r = _q("""SELECT m.*, o.name AS org_name, o.sample FROM members m JOIN orgs o USING (org_id) WHERE m.sb_uid=?""", [sb_uid])
     return r[0] if r else None
 
 
@@ -86,7 +94,7 @@ def require(role: str) -> dict | None:
 
 def _sync(m: dict) -> None:
     """Mirror the member into the org database's users table, so answers name them like any other person."""
-    db = workspace.get(m["org_id"])
+    db = workspace.get(m["org_id"], sample=bool(m["sample"]))
     db.run("DELETE FROM users WHERE dataset_id=? AND user_id=?", [settings.active_dataset, m["user_id"]])
     db.run("INSERT INTO users (dataset_id, user_id, name, role, team_id) VALUES (?,?,?,?,NULL)",
            [settings.active_dataset, m["user_id"], m["name"], m["title"] or m["role"]])
@@ -100,11 +108,12 @@ def _join(org_id: str, sb_uid: str, email: str, name: str, role: str, title: str
     return m
 
 
-def create(sb_uid: str, email: str, name: str, org_name: str, title: str = "") -> dict:
+def create(sb_uid: str, email: str, name: str, org_name: str, title: str = "", sample: bool = False) -> dict:
     if member(sb_uid):
         raise HTTPException(409, "you already belong to an organization")
     org_id = str(uuid.uuid4())
-    _w("INSERT INTO orgs VALUES (?,?,?)", [org_id, org_name.strip(), _now()])
+    _w("INSERT INTO orgs (org_id, name, created_at, sample) VALUES (?,?,?,?)", [org_id, org_name.strip(), _now(), int(sample)])
+    _w("DELETE FROM requests WHERE sb_uid=?", [sb_uid])
     return _join(org_id, sb_uid, email, name.strip(), "owner", title.strip())
 
 
@@ -115,12 +124,49 @@ def accept_invite(sb_uid: str, email: str) -> dict | None:
         return None
     i = inv[0]
     _w("DELETE FROM invites WHERE email=?", [email.lower()])
+    _w("DELETE FROM requests WHERE sb_uid=?", [sb_uid])
     return _join(i["org_id"], sb_uid, email, email.split("@")[0], i["role"])
 
 
 def pending_invite(email: str) -> dict | None:
     r = _q("SELECT i.role, o.name AS org_name FROM invites i JOIN orgs o USING (org_id) WHERE i.email=?", [email.lower()])
     return r[0] if r else None
+
+
+def request_join(sb_uid: str, email: str, name: str, org_id: str) -> dict:
+    if member(sb_uid):
+        raise HTTPException(409, "you already belong to an organization")
+    org = _q("SELECT name FROM orgs WHERE org_id=?", [org_id.strip().lower()])
+    if not org:
+        raise HTTPException(404, "no organization with that id; ask its admin to copy it from Team & settings")
+    _w("INSERT OR REPLACE INTO requests VALUES (?,?,?,?,?)", [sb_uid, org_id.strip().lower(), email.lower(), name.strip(), _now()])
+    return {"org_name": org[0]["name"]}
+
+
+def my_request(sb_uid: str) -> dict | None:
+    r = _q("SELECT o.name AS org_name, r.created_at FROM requests r JOIN orgs o USING (org_id) WHERE r.sb_uid=?", [sb_uid])
+    return r[0] if r else None
+
+
+def cancel_request(sb_uid: str) -> None:
+    _w("DELETE FROM requests WHERE sb_uid=?", [sb_uid])
+
+
+def requests(org_id: str) -> list[dict]:
+    return _q("SELECT email, name, created_at FROM requests WHERE org_id=? ORDER BY created_at", [org_id])
+
+
+def approve(me: dict, email: str, role: str) -> None:
+    _check_role(me, role)
+    r = _q("SELECT * FROM requests WHERE org_id=? AND email=?", [me["org_id"], email.strip().lower()])
+    if not r:
+        raise HTTPException(404, "no such request")
+    _w("DELETE FROM requests WHERE sb_uid=?", [r[0]["sb_uid"]])
+    _join(me["org_id"], r[0]["sb_uid"], r[0]["email"], r[0]["name"], role)
+
+
+def decline(me: dict, email: str) -> None:
+    _w("DELETE FROM requests WHERE org_id=? AND email=?", [me["org_id"], email.strip().lower()])
 
 
 def members(org_id: str) -> list[dict]:

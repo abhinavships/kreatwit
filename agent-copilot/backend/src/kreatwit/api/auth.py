@@ -27,7 +27,7 @@ from kreatwit.settings import settings
 COOKIE = "kreatwit_session"
 TTL = 7 * 24 * 3600
 OPEN = {"/api/health", "/api/auth/session", "/api/auth/logout", "/api/auth/config"}
-NO_ORG_OK = {"/api/auth/me", "/api/org"}  # signed in but not in an org yet: may see who they are and create one
+NO_ORG_OK = {"/api/auth/me", "/api/org", "/api/org/join"}  # signed in but not in an org yet: may see who they are and create one
 PROTECTED = ("/api/",)  # everything else is the static site
 HIDDEN = ("/mcp", "/skills-mcp")  # MCP for local agent clients; not exposed on a public, multi-account server
 
@@ -166,5 +166,5 @@ def me(request: Request) -> dict:
 def _me(uid: str, email: str) -> dict:
     m = orgs.member(uid)
     if m:
-        m = {k: m[k] for k in ("user_id", "name", "title", "role", "org_id", "org_name", "email")}
-    return {"auth": True, "email": email, "member": m, "invite": None if m else orgs.pending_invite(email)}
+        m = {k: m[k] for k in ("user_id", "name", "title", "role", "org_id", "org_name", "email")} | {"sample": bool(m["sample"])}
+    return {"auth": True, "email": email, "member": m, "request": None if m else orgs.my_request(uid)}

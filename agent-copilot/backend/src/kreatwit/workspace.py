@@ -5,7 +5,8 @@ org's file and folder. Each workspace connection is sandboxed (no file access ou
 no ATTACH), which also closes the escape hatches a regex SQL guard misses (read_ndjson_auto, sqlite_scan, ...).
 
 Off when no workspace is set (local dev, tests, evals): everything uses settings.db_path as before.
-A new workspace starts as a copy of the template database (settings.db_path, built from the sample dataset at boot).
+A new workspace starts as a copy of a template: the sample dataset (settings.db_path, built at boot) or, by default,
+the same schema with no rows (empty.duckdb, derived from it on first use), so an org only sees what it uploads.
 """
 
 from __future__ import annotations
@@ -45,8 +46,35 @@ def uploads_dir(ws: str | None = None) -> Path:
     return base / check(ws) if ws else base
 
 
-def get(ws: str):
-    """The workspace's Db, created from the template on first use. Least recently used ones are closed."""
+SAMPLE_ONLY = ("areas", "assertions", "docs", "dq_flags", "episodes", "equipment", "handles", "inspections", "kb_chunks",
+               "kb_vectors", "maintenance", "notes", "reg_events", "report_facts", "reports", "skill_runs", "teams", "users",
+               "wells")  # every table holding sample rows; rules, skills and type_inherits are product config
+
+
+def _empty_template() -> Path:
+    import duckdb
+    out = settings.db_path.with_name("empty.duckdb")
+    if not out.exists():
+        tmp = out.with_suffix(".tmp")
+        shutil.copyfile(settings.db_path, tmp)
+        con = duckdb.connect(str(tmp))
+        try:
+            have = {r[0] for r in con.execute("SELECT table_name FROM duckdb_tables() WHERE schema_name='main'").fetchall()}
+            for t in SAMPLE_ONLY:  # some tables are created lazily, on first use
+                if t in have:
+                    con.execute(f"DELETE FROM {t}")
+            con.execute("LOAD fts")
+            con.execute("PRAGMA create_fts_index('kb_chunks', 'cid', 'title', 'text', stemmer='porter', "
+                        "stopwords='english', ignore='(\\.|[^a-z0-9])+', strip_accents=1, lower=1, overwrite=1)")
+            con.execute("CHECKPOINT")
+        finally:
+            con.close()
+        tmp.rename(out)
+    return out
+
+
+def get(ws: str, sample: bool = False):
+    """The workspace's Db, created on first use from the empty template (or the sample one). LRU ones are closed."""
     from kreatwit.tools.core import Db
 
     with _LOCK:
@@ -56,7 +84,8 @@ def get(ws: str):
         path = db_file(ws)
         if not path.exists():
             path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(settings.db_path, path.with_suffix(".tmp"))  # the template is never opened in-process
+            src = settings.db_path if sample else _empty_template()  # the sample template is never opened in-process
+            shutil.copyfile(src, path.with_suffix(".tmp"))
             path.with_suffix(".tmp").rename(path)
         up = uploads_dir(ws)
         up.mkdir(parents=True, exist_ok=True)

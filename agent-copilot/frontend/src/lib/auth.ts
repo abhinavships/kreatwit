@@ -34,9 +34,9 @@ export async function startServerSession(): Promise<string | null> {
   return j.detail ?? `sign-in failed (HTTP ${r.status})`;
 }
 
-export interface Member { user_id: string; name: string; title: string; role: Role; org_id: string; org_name: string; email: string }
+export interface Member { user_id: string; name: string; title: string; role: Role; org_id: string; org_name: string; email: string; sample: boolean }
 export type Role = "viewer" | "member" | "admin" | "owner";
-export interface Me { auth: boolean; email?: string; member?: Member | null }
+export interface Me { auth: boolean; email?: string; member?: Member | null; request?: { org_name: string; created_at: string } | null }
 export interface Account { email: string; member: Member; onSignOut: () => void }
 
 export async function signOut(): Promise<void> {

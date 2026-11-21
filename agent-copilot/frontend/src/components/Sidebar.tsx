@@ -8,7 +8,7 @@ import { roleLabel, teamLabel } from "@/lib/format";
 export function Sidebar(p: {
   users: User[]; userId: string; onUser: (id: string) => void; account?: Account;
   chats: ChatSummary[]; chatId: string; onChat: (id: string) => void; onNew: () => void;
-  today: string; resetToday?: string; onToday: (d: string) => void; mock: boolean;
+  today: string; resetToday?: string; onToday: (d: string) => void; mock: boolean; showClock?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const me = p.users.find((u) => u.user_id === p.userId);
@@ -58,7 +58,7 @@ export function Sidebar(p: {
       </section>
       )}
 
-      <section aria-label="Clock">
+      {p.showClock !== false && <section aria-label="Clock">
         <label htmlFor="today" className="mb-1 block px-1 text-[11px] font-semibold uppercase tracking-wide text-muted">Today (simulated clock)</label>
         <input id="today" type="date" value={p.today} onChange={(e) => e.target.value && p.onToday(e.target.value)}
           className="w-full rounded-lg border border-line bg-panel px-3 py-1.5 text-sm" />
@@ -66,7 +66,7 @@ export function Sidebar(p: {
           <button type="button" onClick={() => p.onToday(addDays(p.today, 1))} className="rounded-md border border-line px-2 py-0.5 text-xs hover:border-accent">+1 day</button>
           <button type="button" onClick={() => p.onToday(p.resetToday ?? "2026-10-17")} className="rounded-md border border-line px-2 py-0.5 text-xs hover:border-accent">Reset</button>
         </div>
-      </section>
+      </section>}
 
       <section aria-label="Chats" className="min-h-0 flex-1">
         <div className="mb-1 flex items-center justify-between px-1">

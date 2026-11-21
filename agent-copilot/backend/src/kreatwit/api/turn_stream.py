@@ -47,6 +47,25 @@ def _prefs(deps: RunDeps) -> str:
             + "; ".join(dict.fromkeys(r["p"] for r in rows)))
 
 
+PROMPT_REV = "2: uploads listed in the prompt"  # bump when the prompt changes outside SYSTEM (invalidates cached answers)
+
+
+def _uploads() -> str:
+    """What this workspace's users uploaded, in the prompt itself: the agent queries tables it knows exist."""
+    try:
+        from kreatwit.ingest.pipeline import history, user_tables_catalog
+        tables, files = user_tables_catalog(), [h["file"] for h in history(limit=30)]
+    except Exception:  # noqa: BLE001
+        return ""
+    out = ""
+    if tables:
+        out += ("\nUploaded tables in this workspace (query them with sql; for questions about the user's own data, "
+                "look here first):\n" + tables)
+    if files:
+        out += "\nFiles uploaded here (documents are searchable with search_knowledge): " + ", ".join(dict.fromkeys(files))
+    return out
+
+
 async def _salvage(question: str, system: str, tool_texts: list[str], draft: str) -> str:
     """One no-tools call: answer the question from the tool results already fetched (the agent ran out of time/calls)."""
     import httpx
@@ -120,6 +139,11 @@ Rules:
   name the repair or note behind the reason (MNT-/CTX- id).
 - Mention the key record id (e.g. INS-0001-0203) once, inline.
 - To create an image, call generate_image (it is displayed automatically).
+- The user's uploaded tables and documents are data too: query uploaded tables with sql (they are in its catalog) and
+  search uploaded documents with search_knowledge. If the workspace has no data for the question, say so and suggest
+  uploading the file that would answer it (the paperclip button).
+- End with one last line: "Next: " and 2-3 short follow-up questions the user could ask next about this answer,
+  separated by " | ". Each must be answerable from the data. No numbers in them.
 """
 
 
@@ -193,7 +217,7 @@ def _compose(deps: RunDeps, text: str) -> AnswerSpec:
                 break
     visuals = _typed(_focus(deps, visuals))
     appendix, shown = _appendix(deps, visuals)
-    md = text.strip()
+    md, follow = _follow_ups(text.strip())
     # citations: records the figure shows, plus any record id the prose names (from this turn's results only)
     named = set(re.findall(r"\b(?:INS|MNT|CTX|REG)-\d{4}-\d{2,4}\b", md))
     pool = {c.id: c for r in results for c in r.citations}
@@ -204,7 +228,16 @@ def _compose(deps: RunDeps, text: str) -> AnswerSpec:
             cites += [Citation(kind=e["kind"] if e.get("kind") in ("inspection", "note", "assertion") else "inspection", id=e["id"])
                       for e in v.encodings.get("evidence", []) if e.get("id")]
     return AnswerSpec(markdown=md + appendix, visuals=visuals, citations=list({c.id: c for c in cites}.values()),
-                      assumptions=list(dict.fromkeys(n for r in results for n in r.notes))[:4])
+                      assumptions=list(dict.fromkeys(n for r in results for n in r.notes))[:4], follow_ups=follow)
+
+
+def _follow_ups(md: str) -> tuple[str, list[str]]:
+    """Split the model's closing 'Next: a | b | c' line off the answer into suggestion chips."""
+    m = re.search(r"\n?\**Next:?\**:?\s*(.+?)\s*$", md, re.I)
+    if not m or "|" not in m.group(1) and "?" not in m.group(1):
+        return md, []
+    qs = [q.strip(" *-•\"") for q in m.group(1).split("|")]
+    return md[:m.start()].rstrip(), [q for q in qs if 3 < len(q) <= 120][:3]
 
 
 def _typed(visuals: list[Visual]) -> list[Visual]:
@@ -225,7 +258,7 @@ def _typed(visuals: list[Visual]) -> list[Visual]:
 
 async def _live_turn(deps: RunDeps, message: str, state: dict) -> AsyncIterator[dict]:
     history = HISTORY.get(deps.chat_id, [])
-    system = SYSTEM.format(today=deps.today, principal=deps.principal) + _prefs(deps)
+    system = SYSTEM.format(today=deps.today, principal=deps.principal) + _prefs(deps) + _uploads()
     headers = {"X-User-Id": deps.principal, "X-Chat-Id": deps.chat_id, "X-Clock-Today": str(deps.today)}
     ask, attempts, spec, final_msgs = message, [], None, history
     tool_texts: list[str] = []  # every raw tool result this turn, so evidence numbers count as grounded

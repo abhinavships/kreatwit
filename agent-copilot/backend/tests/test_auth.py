@@ -81,7 +81,7 @@ def test_session_exchange(server):
     assert c.post("/api/auth/session", json={"access_token": "forged"}).status_code == 401
     assert c.post("/api/auth/session", json={"access_token": "tok-new"}).status_code == 403  # email not confirmed
     a = signed_in("tok-a")
-    assert a.get("/api/auth/me").json() == {"auth": True, "email": "a@example.com", "member": None, "invite": None}
+    assert a.get("/api/auth/me").json() == {"auth": True, "email": "a@example.com", "member": None, "request": None}
     assert a.get("/api/users").status_code == 403  # signed in, but no org yet
     a.post("/api/org", json={"name": "Acme", "your_name": "Asha", "title": "Ops lead"})
     me = a.get("/api/auth/me").json()["member"]
@@ -193,3 +193,40 @@ def test_daily_upload_cap_is_per_member(server, monkeypatch):
     assert send(a).status_code == 200
     assert send(a).status_code == 429
     assert send(a2).status_code == 200
+
+
+def test_new_orgs_start_empty_unless_sample_asked(server):
+    a, org_a = founder("tok-a", "Acme")
+    assert workspace.get(org_a).rows("SELECT count(*) n FROM wells")[0]["n"] == 0  # no sample wells in a real org
+    assert a.get("/api/auth/me").json()["member"]["sample"] is False
+    b = signed_in("tok-b")
+    org_b = b.post("/api/org", json={"name": "Demo", "your_name": "Bo", "sample": True}).json()["org_id"]
+    assert workspace.get(org_b).rows("SELECT count(*) n FROM wells")[0]["n"] > 0
+    # an empty org still takes uploads and finds them
+    assert a.post("/api/ingest", content=b"# Pump log\n\nPump 9 tripped twice.\n", headers={"X-Filename": "p.md"}).status_code == 200
+    assert workspace.get(org_a).rows("SELECT count(*) n FROM docs WHERE text LIKE '%Pump 9%'")[0]["n"] == 1
+
+
+def test_join_by_org_id_needs_admin_approval(server):
+    a, org_a = founder("tok-a", "Acme")
+    b = signed_in("tok-b")
+    assert b.post("/api/org/join", json={"org_id": "00000000-0000-4000-8000-000000000000", "your_name": "Bo"}).status_code == 404
+    assert b.post("/api/org/join", json={"org_id": org_a, "your_name": "Bo"}).json() == {"org_name": "Acme"}
+    assert b.get("/api/auth/me").json()["request"]["org_name"] == "Acme"
+    assert b.get("/api/users").status_code == 403  # nothing until approved
+    assert [r["email"] for r in a.get("/api/org").json()["requests"]] == ["b@example.com"]
+    assert a.post("/api/org/requests/b@example.com", json={"role": "viewer"}).status_code == 200
+    me = b.get("/api/auth/me").json()["member"]
+    assert (me["org_id"], me["role"], me["name"]) == (org_a, "viewer", "Bo")
+    assert b.post("/api/ingest", content=b"# x\n\ny\n", headers={"X-Filename": "x.md"}).status_code == 403
+    # declined requests leave the person free to start their own workspace
+    c2 = signed_in("tok-a2")
+    c2.post("/api/org/join", json={"org_id": org_a, "your_name": "Al"})
+    assert a.delete("/api/org/requests/a2@example.com").status_code == 200
+    assert c2.get("/api/auth/me").json()["request"] is None
+
+
+def test_follow_ups_split_off_the_answer():
+    from kreatwit.api.turn_stream import _follow_ups
+    assert _follow_ups("Down 21 days.\n\nNext: Why? | Show inspections") == ("Down 21 days.", ["Why?", "Show inspections"])
+    assert _follow_ups("No suggestions here.") == ("No suggestions here.", [])

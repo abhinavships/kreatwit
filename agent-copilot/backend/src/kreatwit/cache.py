@@ -54,7 +54,11 @@ def data_version() -> str:
         u = db.rows("SELECT count(*) n FROM information_schema.tables WHERE table_name LIKE 'user_%'")[0]["n"]
     except Exception:
         u = 0
-    return f"{a['n']}:{a['t']}:{m}:{u}"
+    try:  # every upload (documents and appended rows too, not only new tables)
+        g = db.rows("SELECT count(*) n FROM ingest_log")[0]["n"]
+    except Exception:
+        g = 0
+    return f"{a['n']}:{a['t']}:{m}:{u}:{g}"
 
 
 def norm(q: str) -> str:
@@ -68,7 +72,7 @@ def code_version() -> str:
         from kreatwit import mcp_server
         from kreatwit.api import turn_stream
         tools = [(t.name, t.description, json.dumps(t.parameters, sort_keys=True)) for t in mcp_server.mcp._tool_manager.list_tools()]
-        _CODE = hashlib.sha1(json.dumps([turn_stream.SYSTEM, tools]).encode()).hexdigest()[:12]
+        _CODE = hashlib.sha1(json.dumps([turn_stream.SYSTEM, turn_stream.PROMPT_REV, tools]).encode()).hexdigest()[:12]
     return _CODE
 
 

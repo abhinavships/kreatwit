@@ -7,7 +7,8 @@ import { Centered, leave, useMe } from "@/components/AuthGate";
 
 interface OrgMember { user_id: string; email: string; name: string; title: string; role: Role; joined_at: string }
 interface Invite { email: string; role: Role; invited_by: string; created_at: string }
-interface Org { org: { org_id: string; name: string }; me: { user_id: string; role: Role }; members: OrgMember[]; invites: Invite[] }
+interface JoinRequest { email: string; name: string; created_at: string }
+interface Org { org: { org_id: string; name: string }; me: { user_id: string; role: Role }; members: OrgMember[]; invites: Invite[]; requests: JoinRequest[] }
 
 const ROLES: Role[] = ["viewer", "member", "admin", "owner"];
 const RANK = (r: Role) => ROLES.indexOf(r);
@@ -117,6 +118,40 @@ export default function OrgPage() {
             ))}
           </ul>
         </section>
+
+        {admin && (
+          <section className={card} aria-labelledby="id-h">
+            <h2 id="id-h" className="font-semibold">Organization ID</h2>
+            <p className="mt-1 text-sm text-muted">People who sign up can ask to join with this ID. You approve each request and pick their role.</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <code className="min-w-0 flex-1 truncate rounded-lg border border-line bg-raised px-3 py-2 text-sm">{org.org.org_id}</code>
+              <button type="button" className="rounded-lg border border-line px-4 py-2 text-sm font-semibold hover:border-accent"
+                onClick={() => navigator.clipboard?.writeText(org.org.org_id).then(() => setNote("Organization ID copied."))}>Copy</button>
+            </div>
+            {org.requests.length > 0 && (
+              <>
+                <h3 className="mt-4 text-sm font-semibold">Requests to join ({org.requests.length})</h3>
+                <ul className="mt-1 divide-y divide-line">
+                  {org.requests.map((q) => (
+                    <li key={q.email} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                      <span className="min-w-0 truncate">{q.name} <span className="text-muted">· {q.email}</span></span>
+                      <span className="flex items-center gap-2">
+                        <select aria-label={`Role for ${q.name}`} defaultValue="viewer" id={`role-${q.email}`} className={`${field} py-1`}>
+                          {grantable.map((r) => <option key={r} value={r}>{r}</option>)}
+                        </select>
+                        <button type="button" className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-accent-fg"
+                          onClick={() => run(call("POST", `/requests/${encodeURIComponent(q.email)}`,
+                            { role: (document.getElementById(`role-${q.email}`) as HTMLSelectElement).value }), `${q.name} joined.`)}>Approve</button>
+                        <button type="button" className="text-xs underline"
+                          onClick={() => run(call("DELETE", `/requests/${encodeURIComponent(q.email)}`))}>Decline</button>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </section>
+        )}
 
         {admin && (
           <section className={card} aria-labelledby="invite-h">
